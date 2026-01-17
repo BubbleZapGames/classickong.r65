@@ -4,6 +4,8 @@
 // Handles title screen, intro, level start, and level clear cutscenes
 // ============================================================================
 
+#[bank(0)]
+
 // ============================================================================
 // CUTSCENE VARIABLES
 // ============================================================================
@@ -132,8 +134,10 @@ far fn full_title_screen() -> u8 {
     oam_clear();
 
     // Copy title graphics to VRAM
-    copy_to_vram(0x1800, &title_top_gfx as far *u8, 2400, 0);
-    copy_to_vram(0x1CB0, &title_bottom_gfx as far *u8, 6912, 0);
+    set_dma_src(&title_top_gfx as *u8 as u16, DATA_BANK_4);
+    copy_to_vram(0x1800, 2400);
+    set_dma_src(&title_bottom_gfx as *u8 as u16, DATA_BANK_4);
+    copy_to_vram(0x1CB0, 6912);
 
     clear_nametables();
 

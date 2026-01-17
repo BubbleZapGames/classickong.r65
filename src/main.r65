@@ -172,25 +172,38 @@ const OAM_LADDERS: u16 = 57 << 2;     // 2 sprites
 
 #[mode(m16, x16, transition=inline)]
 far fn setup_palettes() {
+    // All game palettes are in bank 1
     // Font palette (colors 0-15)
-    set_palette(0, 16, &font_pal as far *u16);
+    set_pal_src(&font_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(0, 16);
 
     // Tileset palettes
-    set_palette(16, 16, &tileset1_pal as far *u16);
-    set_palette(32, 16, &tileset2_pal as far *u16);
+    set_pal_src(&tileset1_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(16, 16);
+    set_pal_src(&tileset2_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(32, 16);
 
     // Title screen palettes
-    set_palette(80, 16, &title_top_pal as far *u16);
-    set_palette(96, 16, &title_bottom_pal as far *u16);
+    set_pal_src(&title_top_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(80, 16);
+    set_pal_src(&title_bottom_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(96, 16);
 
     // Sprite palettes (start at 128 for OBJ)
-    set_palette(128, 16, &sprites1_pal as far *u16);  // Player
-    set_palette(144, 16, &sprites2_pal as far *u16);  // Items
-    set_palette(160, 16, &sprites3_pal as far *u16);  // Kong
-    set_palette(176, 16, &sprites4_pal as far *u16);  // Barrels
-    set_palette(192, 16, &sprites5_pal as far *u16);  // Enemies
-    set_palette(208, 16, &sprites6_pal as far *u16);  // Princess
-    set_palette(240, 16, &sprites2_pal as far *u16);  // Game over text
+    set_pal_src(&sprites1_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(128, 16);  // Player
+    set_pal_src(&sprites2_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(144, 16);  // Items
+    set_pal_src(&sprites3_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(160, 16);  // Kong
+    set_pal_src(&sprites4_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(176, 16);  // Barrels
+    set_pal_src(&sprites5_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(192, 16);  // Enemies
+    set_pal_src(&sprites6_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(208, 16);  // Princess
+    set_pal_src(&sprites2_pal as *u8 as u16, DATA_BANK_1);
+    set_palette(240, 16);  // Game over text
 }
 
 
@@ -202,12 +215,18 @@ far fn setup_palettes() {
 far fn setup_ingame_graphics() {
     let offset: u16 = 0x2000;
 
-    copy_to_vram(offset + (PLAYER_TILE << 4), &sprites1_gfx as far *u8, 3072, 0);
-    copy_to_vram(offset + (ITEMS_TILE << 4), &sprites2_gfx as far *u8, 2048, 0);
-    copy_to_vram(offset + (KONG_TILE << 4), &sprites3_gfx as far *u8, 5120, 0);
-    copy_to_vram(offset + (BARREL_TILE << 4), &sprites4_gfx as far *u8, 1024, 0);
-    copy_to_vram(offset + (ENEMY_TILE << 4), &sprites5_gfx as far *u8, 4096, 0);
-    copy_to_vram(offset + (PRINCESS_TILE << 4), &sprites6_gfx as far *u8, 1024, 0);
+    set_dma_src(&sprites1_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(offset + (PLAYER_TILE << 4), 3072);
+    set_dma_src(&sprites2_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(offset + (ITEMS_TILE << 4), 2048);
+    set_dma_src(&sprites3_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(offset + (KONG_TILE << 4), 5120);
+    set_dma_src(&sprites4_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(offset + (BARREL_TILE << 4), 1024);
+    set_dma_src(&sprites5_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(offset + (ENEMY_TILE << 4), 4096);
+    set_dma_src(&sprites6_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(offset + (PRINCESS_TILE << 4), 1024);
 }
 
 
@@ -226,10 +245,12 @@ far fn show_logo() {
     BG12NBA = 0x70;  // Patterns at $7000
 
     // Copy logo graphics to VRAM
-    copy_to_vram(0x0800, &bzlogo_gfx as far *u8, 7168, 0);
+    set_dma_src(&bzlogo_gfx as *u8 as u16, DATA_BANK_4);
+    copy_to_vram(0x0800, 7168);
 
-    // Copy logo palette (256 colors)
-    set_palette(0, 256, &bzlogo_pal as far *u16);
+    // Copy logo palette (256 colors) - in bank 4
+    set_pal_src(&bzlogo_pal as *u8 as u16, DATA_BANK_4);
+    set_palette(0, 256);
 
     // Clear nametables
     clear_nametables();
@@ -285,7 +306,7 @@ far fn show_logo() {
 // ============================================================================
 
 #[mode(m16, x16, transition=inline)]
-far fn fade_screen(fade_in @ A: u8, with_sound: u8) {
+far fn fade_screen(fade_in: u8, with_sound: u8) {
     let level: u8 = 1;
 
     loop {
@@ -362,7 +383,8 @@ far fn title_screen() -> u8 {
     put_str(&nametable1[POS!(6, 12)] as *u16, &str_press_start as far *u8);
 
     // Load font graphics
-    copy_to_vram(0x1000, &font_gfx as far *u8, 2048, 0);
+    set_dma_src(&font_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(0x1000, 2048);
 
     update_nametables();
     setup_palettes();
@@ -510,8 +532,10 @@ far fn game_loop() -> u8 {
     clear_nametables();
 
     // Load level graphics
-    copy_to_vram(0x1000, &font_gfx as far *u8, 2048, 0);
-    copy_to_vram(0x1400, &tileset1_gfx as far *u8, 2048, 0);
+    set_dma_src(&font_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(0x1000, 2048);
+    set_dma_src(&tileset1_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(0x1400, 2048);
 
     setup_ingame_graphics();
 
@@ -647,7 +671,7 @@ far fn game_loop() -> u8 {
 #[bank(0)]
 
 #[entry]
-#[mode(m8, x16, transition=inline)]
+#[mode(m8, x16, transition=none)]
 far fn main() -> ! {
     // Initialize hardware
     game_init();
@@ -665,8 +689,10 @@ far fn main() -> ! {
     game_init();
 
     // Load shared graphics
-    copy_to_vram(0x1000, &font_gfx as far *u8, 2048, 0);
-    copy_to_vram(0x1400, &tileset1_gfx as far *u8, 2048, 0);
+    set_dma_src(&font_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(0x1000, 2048);
+    set_dma_src(&tileset1_gfx as *u8 as u16, DATA_BANK_1);
+    copy_to_vram(0x1400, 2048);
 
     // Initialize sound system
     spc_setup();
