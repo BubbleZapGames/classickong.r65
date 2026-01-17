@@ -62,10 +62,10 @@ static mut game_lives: u8;
 static mut game_rivets: u8;
 
 #[lowram]
-static mut game_score: u32;
+static mut game_score: u16;  // Simplified to u16 for now
 
 #[lowram]
-static mut game_best_score: u32;
+static mut game_best_score: u16;  // Simplified to u16 for now
 
 #[lowram]
 static mut game_loops: u8;
@@ -81,6 +81,21 @@ static mut game_test_mode: u8;
 
 #[lowram]
 static mut game_hard_mode: u8;
+
+
+// ============================================================================
+// UI STRINGS
+// ============================================================================
+
+static str_pal_detected: [u8; 21] = "PAL SYSTEM DETECTED!";
+static str_pal_line1: [u8; 31] = "THIS GAME IS DESIGNED FOR NTSC";
+static str_pal_line2: [u8; 31] = "SYSTEM ONLY.  IT WILL RUN, BUT";
+static str_pal_line3: [u8; 29] = "SLOWER THAN INTENDED. SORRY.";
+static str_pal_continue: [u8; 24] = "PRESS START TO CONTINUE";
+static str_classic_kong: [u8; 13] = "CLASSIC KONG";
+// str_press_start is defined in cutscenes.r65
+static str_level1_help: [u8; 28] = "LEVEL 1  - USE ARROWS + A/B";
+static str_press_exit: [u8; 20] = "PRESS START TO EXIT";
 
 
 // ============================================================================
@@ -121,15 +136,16 @@ const PRINCESS_TILE: u16 = ENEMY_TILE + 128; // 4096 >> 5
 
 // ============================================================================
 // CONSTANTS - Sprite Attributes
+// SPR_PAL(n) = (n & 7) << 9, SPR_PRI(n) = (n & 3) << 12
 // ============================================================================
 
-const PLAYER_ATR: u16 = SPR_PAL!(0) | SPR_PRI!(2);
-const ITEM_ATR: u16 = SPR_PAL!(1) | SPR_PRI!(2);
-const KONG_ATR: u16 = SPR_PAL!(2) | SPR_PRI!(2);
-const PRINCESS_ATR: u16 = SPR_PAL!(5) | SPR_PRI!(2);
-const BARREL_ATR: u16 = SPR_PAL!(3) | SPR_PRI!(2);
-const ENEMY_ATR: u16 = SPR_PAL!(4) | SPR_PRI!(2);
-const GAMEOVER_ATR: u16 = SPR_PAL!(7) | SPR_PRI!(3);
+const PLAYER_ATR: u16 = 0x2000;    // PAL 0, PRI 2
+const ITEM_ATR: u16 = 0x2200;      // PAL 1, PRI 2
+const KONG_ATR: u16 = 0x2400;      // PAL 2, PRI 2
+const PRINCESS_ATR: u16 = 0x2A00;  // PAL 5, PRI 2
+const BARREL_ATR: u16 = 0x2600;    // PAL 3, PRI 2
+const ENEMY_ATR: u16 = 0x2800;     // PAL 4, PRI 2
+const GAMEOVER_ATR: u16 = 0x3E00;  // PAL 7, PRI 3
 
 
 // ============================================================================
@@ -154,8 +170,8 @@ const OAM_LADDERS: u16 = 57 << 2;     // 2 sprites
 // FUNCTION: Setup Game Palettes
 // ============================================================================
 
-#[mode(m8, x8)]
-fn setup_palettes() {
+#[mode(m16, x16, transition=inline)]
+far fn setup_palettes() {
     // Font palette (colors 0-15)
     set_palette(0, 16, &font_pal as far *u16);
 
@@ -182,8 +198,8 @@ fn setup_palettes() {
 // FUNCTION: Setup In-Game Graphics
 // ============================================================================
 
-#[mode(m8, x8)]
-fn setup_ingame_graphics() {
+#[mode(m16, x16, transition=inline)]
+far fn setup_ingame_graphics() {
     let offset: u16 = 0x2000;
 
     copy_to_vram(offset + (PLAYER_TILE << 4), &sprites1_gfx as far *u8, 3072, 0);
@@ -199,8 +215,8 @@ fn setup_ingame_graphics() {
 // FUNCTION: Show Company Logo
 // ============================================================================
 
-#[mode(m8, x8)]
-fn show_logo() {
+#[mode(m16, x16, transition=inline)]
+far fn show_logo() {
     // Set mode 3 for 256-color logo
     BGMODE = 0x0B;  // Mode 3, 2 layers
 
@@ -254,7 +270,7 @@ fn show_logo() {
             set_bright(bright);
         }
 
-        set_pixelize(pixel >> 1);
+        set_pixelize(pixel >> 1, SCREEN_BG1 | SCREEN_BG2);
         pixel++;
 
         if pixel >= 34 {
@@ -268,8 +284,8 @@ fn show_logo() {
 // FUNCTION: Fade Screen In or Out
 // ============================================================================
 
-#[mode(m8, x8)]
-fn fade_screen(fade_in @ A: u8, with_sound: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn fade_screen(fade_in @ A: u8, with_sound: u8) {
     let level: u8 = 1;
 
     loop {
@@ -293,17 +309,17 @@ fn fade_screen(fade_in @ A: u8, with_sound: u8) {
 // FUNCTION: Show PAL Warning Screen
 // ============================================================================
 
-#[mode(m8, x8)]
-fn show_pal_warning() {
+#[mode(m16, x16, transition=inline)]
+far fn show_pal_warning() {
     set_bright(0);
     oam_clear();
     clear_nametables();
 
-    put_str(&nametable1[POS!(6, 7)] as *u16, "PAL SYSTEM DETECTED!" as far *u8);
-    put_str(&nametable1[POS!(1, 11)] as *u16, "THIS GAME IS DESIGNED FOR NTSC" as far *u8);
-    put_str(&nametable1[POS!(1, 13)] as *u16, "SYSTEM ONLY.  IT WILL RUN, BUT" as far *u8);
-    put_str(&nametable1[POS!(1, 15)] as *u16, "SLOWER THAN INTENDED. SORRY." as far *u8);
-    put_str(&nametable1[POS!(4, 19)] as *u16, "PRESS START TO CONTINUE" as far *u8);
+    put_str(&nametable1[POS!(6, 7)] as *u16, &str_pal_detected as far *u8);
+    put_str(&nametable1[POS!(1, 11)] as *u16, &str_pal_line1 as far *u8);
+    put_str(&nametable1[POS!(1, 13)] as *u16, &str_pal_line2 as far *u8);
+    put_str(&nametable1[POS!(1, 15)] as *u16, &str_pal_line3 as far *u8);
+    put_str(&nametable1[POS!(4, 19)] as *u16, &str_pal_continue as far *u8);
 
     update_nametables();
     setup_palettes();
@@ -335,15 +351,15 @@ fn show_pal_warning() {
 // FUNCTION: Title Screen (placeholder)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn title_screen() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn title_screen() -> u8 {
     set_bright(0);
     oam_clear();
     clear_nametables();
 
     // Display title text
-    put_str(&nametable1[POS!(8, 8)] as *u16, "CLASSIC KONG" as far *u8);
-    put_str(&nametable1[POS!(6, 12)] as *u16, "PRESS START" as far *u8);
+    put_str(&nametable1[POS!(8, 8)] as *u16, &str_classic_kong as far *u8);
+    put_str(&nametable1[POS!(6, 12)] as *u16, &str_press_start as far *u8);
 
     // Load font graphics
     copy_to_vram(0x1000, &font_gfx as far *u8, 2048, 0);
@@ -378,8 +394,8 @@ fn title_screen() -> u8 {
 // Creates floor at Y=200 for testing
 // ============================================================================
 
-#[mode(m8, x16)]
-fn init_test_walkmap() {
+#[mode(m8, x16, transition=inline)]
+far fn init_test_walkmap() {
     // Clear walkmap
     X = 0;
     loop {
@@ -439,8 +455,8 @@ fn init_test_walkmap() {
 // FUNCTION: Draw Test Level Background
 // ============================================================================
 
-#[mode(m8, x16)]
-fn draw_test_level() {
+#[mode(m8, x16, transition=inline)]
+far fn draw_test_level() {
     // Draw floor tiles at Y=200 (tile row 25)
     let pos: u16 = POS!(0, 25);
     X = 0;
@@ -476,8 +492,8 @@ fn draw_test_level() {
     }
 
     // Draw level indicator
-    put_str(&nametable1[POS!(2, 2)] as *u16, "LEVEL 1  - USE ARROWS + A/B" as far *u8);
-    put_str(&nametable1[POS!(2, 4)] as *u16, "PRESS START TO EXIT" as far *u8);
+    put_str(&nametable1[POS!(2, 2)] as *u16, &str_level1_help as far *u8);
+    put_str(&nametable1[POS!(2, 4)] as *u16, &str_press_exit as far *u8);
 }
 
 
@@ -485,8 +501,8 @@ fn draw_test_level() {
 // FUNCTION: Game Loop - Full Player Control
 // ============================================================================
 
-#[mode(m8, x8)]
-fn game_loop() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn game_loop() -> u8 {
     let clear: u8 = 0;
 
     set_bright(0);
@@ -628,10 +644,11 @@ fn game_loop() -> u8 {
 // ENTRY POINT
 // ============================================================================
 
-#[entry]
 #[bank(0)]
-#[mode(m8, x8)]
-fn main() -> ! {
+
+#[entry]
+#[mode(m8, x16, transition=inline)]
+far fn main() -> ! {
     // Initialize hardware
     game_init();
 
@@ -655,7 +672,7 @@ fn main() -> ! {
     spc_setup();
 
     // Show PAL warning if needed
-    if is_ntsc == 0 {
+    if ntsc_mode == 0 {
         show_pal_warning();
     }
 

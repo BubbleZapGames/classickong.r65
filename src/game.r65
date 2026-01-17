@@ -37,10 +37,18 @@ static mut rand_seed2: u16;
 // ============================================================================
 
 #[lowram]
-static mut is_ntsc: u8;
+static mut ntsc_mode: u8;
 
 #[lowram]
 static mut skip_cnt: u8;
+
+
+// ============================================================================
+// LOOKUP TABLES - Bit masks for OAM manipulation
+// ============================================================================
+
+// Bit masks: oam_bit_masks[n] = 1 << n (for n = 0-7)
+static oam_bit_masks: [u8; 8] = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80];
 
 
 // ============================================================================
@@ -126,40 +134,25 @@ macro_rules! SPR_PAL($pal:expr) { (($pal & 0x07) << 9) }
 // Build sprite priority attribute: priority << 12
 macro_rules! SPR_PRI($pri:expr) { (($pri & 0x03) << 12) }
 
-const SPR_HFLIP: u16 = 0x4000;
-const SPR_VFLIP: u16 = 0x8000;
+// SPR_HFLIP, SPR_VFLIP, BG_HFLIP, BG_VFLIP are defined in sneslib.r65
 
 // Build BG palette attribute: (palette & 7) << 10
 macro_rules! BG_PAL($pal:expr) { (($pal & 0x07) << 10) }
 
-const BG_PRI: u16 = 0x2000;
-const BG_HFLIP: u16 = 0x4000;
-const BG_VFLIP: u16 = 0x8000;
+const BG_PRI: u16 = 0x2000;  // Local alias for BG_PRIORITY
 
 
-// ============================================================================
-// CONSTANTS - Color Masks
-// ============================================================================
+// Color masks (R_MASK, G_MASK, B_MASK) are defined in sneslib.r65
 
-const R_MASK: u16 = 0x001F;
-const G_MASK: u16 = 0x03E0;
-const B_MASK: u16 = 0x7C00;
-
-
-// ============================================================================
-// CONSTANTS - Boolean
-// ============================================================================
-
-const FALSE: u8 = 0;
-const TRUE: u8 = 1;
+// Boolean constants (TRUE, FALSE) are defined in sneslib.r65
 
 
 // ============================================================================
 // FUNCTION: 16-bit Random Number Generator
 // ============================================================================
 
-#[mode(m16, x16)]
-fn rand() -> u16 {
+#[mode(m16, x16, transition=inline)]
+far fn rand() -> u16 {
     A = rand_seed2;
     A = A >> 1;
     A = A + rand_seed1;
@@ -179,8 +172,8 @@ fn rand() -> u16 {
 // ============================================================================
 
 #[interrupt(nmi)]
-#[mode(m8, x8)]
-fn nmi_handler() {
+#[mode(m16, x16, transition=inline)]
+far fn nmi_handler() {
     // DMA OAM buffer to PPU (channel 7)
     OAMADDL = 0;
     OAMADDH = 0;
@@ -190,8 +183,8 @@ fn nmi_handler() {
     BBAD7 = 0x04;  // $2104 = OAMDATA
 
     // Set source address (oam_buffer)
-    A1T7L = &oam_buffer as u8;
-    A1T7H = (&oam_buffer >> 8) as u8;
+    A1T7L = (&oam_buffer as u16) as u8;
+    A1T7H = ((&oam_buffer as u16) >> 8) as u8;
     A1B7 = 0x7E;  // Bank $7E (WRAM)
 
     // Set size: 544 bytes ($0220)
@@ -210,8 +203,8 @@ fn nmi_handler() {
 // FUNCTION: Wait for Next Frame (NMI)
 // ============================================================================
 
-#[mode(m16, x8)]
-fn nmi_wait() {
+#[mode(m16, x8, transition=inline)]
+far fn nmi_wait() {
     let prev @ A: u16 = frame_cnt;
 
     loop {
@@ -226,8 +219,8 @@ fn nmi_wait() {
 // FUNCTION: Poll Joypad Ports
 // ============================================================================
 
-#[mode(m16, x8)]
-fn pad_read_ports() {
+#[mode(m16, x8, transition=inline)]
+far fn pad_read_ports() {
     // Wait for joypad read to complete
     loop {
         A = HVBJOY as u16;
@@ -273,8 +266,8 @@ fn pad_read_ports() {
 // FUNCTION: Get Joypad State
 // ============================================================================
 
-#[mode(m16, x8)]
-fn pad_poll(joy @ X: u8) -> u16 {
+#[mode(m16, x8, transition=inline)]
+far fn pad_poll(joy @ X: u8) -> u16 {
     return joypad_state[X];
 }
 
@@ -283,8 +276,8 @@ fn pad_poll(joy @ X: u8) -> u16 {
 // FUNCTION: Get Joypad Trigger State
 // ============================================================================
 
-#[mode(m16, x8)]
-fn pad_poll_trigger(joy @ X: u8) -> u16 {
+#[mode(m16, x8, transition=inline)]
+far fn pad_poll_trigger(joy @ X: u8) -> u16 {
     return joypad_state_trigger[X];
 }
 
@@ -293,8 +286,8 @@ fn pad_poll_trigger(joy @ X: u8) -> u16 {
 // FUNCTION: Set Palette Entries
 // ============================================================================
 
-#[mode(m16, x16)]
-fn set_palette(start @ X: u16, count @ Y: u16, src: far *u16) {
+#[mode(m16, x16, transition=inline)]
+far fn set_palette(start @ X: u16, count @ Y: u16, src: far *u16) {
     loop {
         A = *src;
         palette_buffer[X] = A;
@@ -312,8 +305,8 @@ fn set_palette(start @ X: u16, count @ Y: u16, src: far *u16) {
 // FUNCTION: Set Single Palette Color
 // ============================================================================
 
-#[mode(m16, x16)]
-fn set_color(index @ X: u16, color @ A: u16) {
+#[mode(m16, x16, transition=inline)]
+far fn set_color(index @ X: u16, color @ A: u16) {
     palette_buffer[X] = color;
 }
 
@@ -322,16 +315,16 @@ fn set_color(index @ X: u16, color @ A: u16) {
 // FUNCTION: Update Palette to VRAM via DMA
 // ============================================================================
 
-#[mode(m8, x8)]
-fn update_palette() {
+#[mode(m16, x16, transition=inline)]
+far fn update_palette() {
     // DMA palette buffer to CGRAM (channel 7)
     CGADD = 0;  // Start at color 0
 
     DMAP7 = 0x02;  // 1 register, write twice (low/high)
     BBAD7 = 0x22;  // $2122 = CGDATA
 
-    A1T7L = &palette_buffer as u8;
-    A1T7H = (&palette_buffer >> 8) as u8;
+    A1T7L = ((&palette_buffer as far *u8) as u16) as u8;
+    A1T7H = (((&palette_buffer as far *u8) as u16) >> 8) as u8;
     A1B7 = 0x7E;
 
     DAS7L = 0x00;  // 512 bytes ($0200)
@@ -345,8 +338,8 @@ fn update_palette() {
 // FUNCTION: Copy Data to VRAM via DMA
 // ============================================================================
 
-#[mode(m8, x8)]
-fn copy_to_vram(vram_addr @ X: u16, src: far *u8, size @ Y: u16, bank @ A: u8) {
+#[mode(m8, x16, transition=inline)]
+far fn copy_to_vram(vram_addr @ X: u16, src: far *u8, size @ Y: u16, bank @ A: u8) {
     // Set VRAM address
     VMADDL = X as u8;
     VMADDH = (X >> 8) as u8;
@@ -356,8 +349,8 @@ fn copy_to_vram(vram_addr @ X: u16, src: far *u8, size @ Y: u16, bank @ A: u8) {
     DMAP7 = 0x01;  // 2 registers (L, H)
     BBAD7 = 0x18;  // $2118 = VMDATAL
 
-    A1T7L = src as u8;
-    A1T7H = (src >> 8) as u8;
+    A1T7L = (src as u16) as u8;
+    A1T7H = ((src as u16) >> 8) as u8;
     A1B7 = bank;
 
     DAS7L = Y as u8;
@@ -374,8 +367,8 @@ fn copy_to_vram(vram_addr @ X: u16, src: far *u8, size @ Y: u16, bank @ A: u8) {
 #[zeropage]
 static mut fill_value: u8;
 
-#[mode(m8, x8)]
-fn fill_vram(vram_addr @ X: u16, value @ A: u8, size @ Y: u16) {
+#[mode(m8, x16, transition=inline)]
+far fn fill_vram(vram_addr @ X: u16, value @ A: u8, size @ Y: u16) {
     fill_value = value;
 
     VMADDL = X as u8;
@@ -385,8 +378,8 @@ fn fill_vram(vram_addr @ X: u16, value @ A: u8, size @ Y: u16) {
     DMAP7 = 0x09;  // 2 registers, fixed source
     BBAD7 = 0x18;
 
-    A1T7L = &fill_value as u8;
-    A1T7H = (&fill_value >> 8) as u8;
+    A1T7L = (&fill_value as u16) as u8;
+    A1T7H = ((&fill_value as u16) >> 8) as u8;
     A1B7 = 0x00;  // Direct page bank
 
     DAS7L = Y as u8;
@@ -400,28 +393,29 @@ fn fill_vram(vram_addr @ X: u16, value @ A: u8, size @ Y: u16) {
 // FUNCTION: Set OAM Sprite Entry (full X support, slower)
 // ============================================================================
 
-#[mode(m8, x16)]
-fn oam_spr(x @ A: u16, y: u8, chr: u16, off @ X: u16) {
-    oam_buffer[X] = x as u8;
+#[mode(m16, x16, transition=inline)]
+far fn oam_spr(x_pos: u16, y: u8, chr: u16, off @ X: u16) {
+    oam_buffer[X] = x_pos as u8;
     oam_buffer[X + 1] = y;
     oam_buffer[X + 2] = chr as u8;
     oam_buffer[X + 3] = (chr >> 8) as u8;
 
     // Handle X high bit in extended OAM
     let ext_off: u16 = 512 + (off >> 4);
-    let bit_pos: u8 = (off & 0x0C) >> 1;
+    let bit_pos: u8 = ((off & 0x0C) >> 1) as u8;
 
     let ext_val: u8 = oam_buffer[ext_off];
-    let x_high: u8 = ((x >> 8) & 0x01) as u8;
+    let x_high: u8 = ((x_pos >> 8) & 0x01) as u8;
 
-    // Clear and set the appropriate bit
-    A = 0x01;
-    A = A << bit_pos;
-    let mask @ A: u8 = ~A;
-    ext_val = ext_val & mask;
+    // Clear and set the appropriate bit using bit mask lookup
+    // bit_pos is 0,2,4,6 so we lookup the corresponding mask
+    let set_mask: u8 = oam_bit_masks[bit_pos];
+    let clear_mask: u8 = ~set_mask;
+    ext_val = ext_val & clear_mask;
 
-    A = x_high << bit_pos;
-    ext_val = ext_val | A;
+    if x_high != 0 {
+        ext_val = ext_val | set_mask;
+    }
 
     oam_buffer[ext_off] = ext_val;
 }
@@ -431,8 +425,8 @@ fn oam_spr(x @ A: u16, y: u8, chr: u16, off @ X: u16) {
 // FUNCTION: Set OAM Sprite Entry (fast, X low byte only)
 // ============================================================================
 
-#[mode(m8, x16)]
-fn oam_spr1(x @ A: u8, y: u8, chr: u16, off @ X: u16) {
+#[mode(m8, x16, transition=inline)]
+far fn oam_spr1(x @ A: u8, y: u8, chr: u16, off @ X: u16) {
     oam_buffer[X] = x;
     oam_buffer[X + 1] = y;
     oam_buffer[X + 2] = chr as u8;
@@ -444,25 +438,20 @@ fn oam_spr1(x @ A: u8, y: u8, chr: u16, off @ X: u16) {
 // FUNCTION: Set OAM Sprite Size Bit
 // ============================================================================
 
-#[mode(m8, x16)]
-fn oam_size(off @ X: u16, size @ A: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn oam_size(off @ X: u16, size @ A: u8) {
     let ext_off: u16 = 512 + (off >> 4);
-    let bit_pos: u8 = ((off >> 2) & 3) as u8;
-    bit_pos = bit_pos * 2 + 1;  // Size bit is the odd bit
+    let bit_pos: u8 = (((off >> 2) & 3) * 2 + 1) as u8;  // Size bit is the odd bit (1,3,5,7)
 
     let ext_val: u8 = oam_buffer[ext_off];
+    let mask: u8 = oam_bit_masks[bit_pos];
 
     if size != 0 {
         // Set the size bit
-        A = 0x01;
-        A = A << bit_pos;
-        ext_val = ext_val | A;
+        ext_val = ext_val | mask;
     } else {
         // Clear the size bit
-        A = 0x01;
-        A = A << bit_pos;
-        A = ~A;
-        ext_val = ext_val & A;
+        ext_val = ext_val & (~mask);
     }
 
     oam_buffer[ext_off] = ext_val;
@@ -473,8 +462,8 @@ fn oam_size(off @ X: u16, size @ A: u8) {
 // FUNCTION: Clear OAM Buffer (all sprites off-screen)
 // ============================================================================
 
-#[mode(m8, x16)]
-fn oam_clear() {
+#[mode(m8, x16, transition=inline)]
+far fn oam_clear() {
     X = 0;
 
     loop {
@@ -504,24 +493,15 @@ fn oam_clear() {
 // FUNCTION: Delay for N Frames
 // ============================================================================
 
-#[mode(m16, x8)]
-fn delay(frames @ X: u16) {
-    loop {
-        nmi_wait();
-        X--;
-        if X == 0 {
-            break;
-        }
-    }
-}
+// delay() is now provided by sneslib.r65
 
 
 // ============================================================================
 // FUNCTION: Set Screen Brightness
 // ============================================================================
 
-#[mode(m8, x8)]
-fn set_bright(level @ A: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn set_bright(level @ A: u8) {
     if A == 0 {
         A = 0x80;  // Force blank
     }
@@ -533,8 +513,8 @@ fn set_bright(level @ A: u8) {
 // FUNCTION: Set Scroll for Layer
 // ============================================================================
 
-#[mode(m8, x8)]
-fn set_scroll_layer(layer @ A: u8, x: u16, y: u16) {
+#[mode(m16, x16, transition=inline)]
+far fn set_scroll_layer(layer @ A: u8, x: u16, y: u16) {
     if A == 0 {
         BG1HOFS = x as u8;
         BG1HOFS = (x >> 8) as u8;
@@ -559,27 +539,14 @@ fn set_scroll_layer(layer @ A: u8, x: u16, y: u16) {
 }
 
 
-// ============================================================================
-// FUNCTION: Set Pixelization Effect
-// ============================================================================
-
-#[mode(m8, x8)]
-fn set_pixelize(level @ A: u8) {
-    if A != 0 {
-        A = 16 - A;
-        A = A << 4;
-        A = A | 0x0F;
-    }
-    MOSAIC = A;
-}
-
+// set_pixelize() is now provided by sneslib.r65
 
 // ============================================================================
 // FUNCTION: Initialize Game System
 // ============================================================================
 
-#[mode(m8, x8)]
-fn game_init() {
+#[mode(m16, x16, transition=inline)]
+far fn game_init() {
     // Initialize variables
     frame_cnt = 0;
     rand_seed1 = 1;
@@ -589,9 +556,9 @@ fn game_init() {
     // Check NTSC/PAL
     A = STAT78;
     if A & 0x10 != 0 {
-        is_ntsc = 0;  // PAL
+        ntsc_mode = 0;  // PAL
     } else {
-        is_ntsc = 1;  // NTSC
+        ntsc_mode = 1;  // NTSC
     }
 
     // Initialize joypad state
@@ -651,8 +618,8 @@ fn game_init() {
 // FUNCTION: Clear All Nametables
 // ============================================================================
 
-#[mode(m16, x16)]
-fn clear_nametables() {
+#[mode(m16, x16, transition=inline)]
+far fn clear_nametables() {
     X = 0;
     A = 0x0100;  // Empty tile
 
@@ -672,8 +639,8 @@ fn clear_nametables() {
 // FUNCTION: Upload Nametables to VRAM
 // ============================================================================
 
-#[mode(m8, x8)]
-fn update_nametables() {
+#[mode(m8, x16, transition=inline)]
+far fn update_nametables() {
     copy_to_vram(0x0000, &nametable1 as far *u8, 2048, 0x7E);
     copy_to_vram(0x0400, &nametable2 as far *u8, 2048, 0x7E);
     copy_to_vram(0x7C00, &nametable3 as far *u8, 2048, 0x7E);
@@ -684,8 +651,8 @@ fn update_nametables() {
 // FUNCTION: RLE Decompression
 // ============================================================================
 
-#[mode(m8, x16)]
-fn unrle(dst: *u8, src: far *u8) {
+#[mode(m8, x16, transition=inline)]
+far fn unrle(dst: *u8, src: far *u8) {
     let tag: u8 = *src;
     src++;
 
@@ -729,8 +696,8 @@ fn unrle(dst: *u8, src: far *u8) {
 
 const TEXT_ATR: u16 = 0x0100;  // BG_PAL(0) | BG_PRI
 
-#[mode(m8, x16)]
-fn put_str(dst: *u16, str: far *u8) {
+#[mode(m8, x16, transition=inline)]
+far fn put_str(dst: *u16, str: far *u8) {
     loop {
         let ch @ A: u8 = *str;
         str++;
@@ -753,12 +720,12 @@ fn put_str(dst: *u16, str: far *u8) {
 // FUNCTION: Put Number into Nametable
 // ============================================================================
 
-#[mode(m16, x16)]
-fn put_num(dst: *u16, num @ A: u16, len: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn put_num_u16(dst: *u16, num @ A: u16, len: u8) {
     // This is a simplified version - full implementation needs division
     // For now, just output the low digit
-    let digit: u16 = num % 10;
-    digit = digit + (('0' as u16) - 32) + TEXT_ATR;
+    let digit: u16 = mod16(num, 10);
+    digit = digit + ((48 as u16) - 32) + TEXT_ATR;  // 48 = ASCII '0'
 
     // Position at rightmost digit
     dst = dst + (len as u16) - 1;

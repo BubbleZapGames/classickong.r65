@@ -26,6 +26,14 @@ static height_str_100: [u8; 9] = "100 M  $";
 static test_code: [u16; 6] = [PAD_B, PAD_A, PAD_R, PAD_R, PAD_A, PAD_L];
 static hard_code: [u16; 8] = [PAD_B, PAD_A, PAD_DOWN, PAD_B, PAD_UP, PAD_DOWN, PAD_DOWN, PAD_Y];
 
+// UI strings
+static str_press_start: [u8; 12] = "PRESS START";
+static str_blank_11: [u8; 12] = "           ";
+static str_score: [u8; 13] = "SCORE:000000";
+static str_best: [u8; 12] = "BEST:000000";
+static str_copyright: [u8; 16] = "@2012 BUBBLEZAP";
+static str_how_high: [u8; 23] = "HOW HIGH CAN YOU GET ?";
+
 // Platform bending animation tiles
 static platform_anim: [u16; 14] = [
     0x0140 | BG_PAL!(1),  // Frame 0 top
@@ -49,12 +57,12 @@ static platform_anim: [u16; 14] = [
 // FUNCTION: Display Press Start Message
 // ============================================================================
 
-#[mode(m8, x8)]
-fn title_screen_press_start_str(show @ A: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn title_screen_press_start_str(show @ A: u8) {
     if show != 0 {
-        put_str(&nametable1[POS!(10, 22)] as *u16, "PRESS START" as far *u8);
+        put_str(&nametable1[POS!(10, 22)] as *u16, &str_press_start as far *u8);
     } else {
-        put_str(&nametable1[POS!(10, 22)] as *u16, "           " as far *u8);
+        put_str(&nametable1[POS!(10, 22)] as *u16, &str_blank_11 as far *u8);
     }
 }
 
@@ -63,8 +71,8 @@ fn title_screen_press_start_str(show @ A: u8) {
 // FUNCTION: Fill Rectangle in Nametable with Tiles
 // ============================================================================
 
-#[mode(m8, x16)]
-fn title_set_rect(off @ X: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
+#[mode(m8, x16, transition=inline)]
+far fn title_set_rect(off @ X: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
     let row: u8 = 0;
     let current_tile: u16 = tile;
     let pos: u16 = off;
@@ -93,10 +101,10 @@ fn title_set_rect(off @ X: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
 // FUNCTION: Put Number (decimal)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn put_num(dest @ X: *u16, value: u32, digits: u8) {
+#[mode(m8, x16, transition=inline)]
+far fn put_num(dest @ X: *u16, value: u16, digits: u8) {
     let d: u8 = digits;
-    let v: u32 = value;
+    let v: u16 = value;
 
     // Write digits right-to-left
     loop {
@@ -105,10 +113,10 @@ fn put_num(dest @ X: *u16, value: u32, digits: u8) {
         }
         d--;
 
-        let digit: u8 = (v % 10) as u8;
-        v = v / 10;
+        let digit: u8 = mod16(v, 10) as u8;
+        v = div16(v, 10);
 
-        dest[d] = (0x30 + digit) as u16;  // ASCII '0' + digit
+        dest[d] = (0x30 + (digit as u16)) | TEXT_ATR;  // ASCII '0' + digit
     }
 }
 
@@ -118,8 +126,8 @@ fn put_num(dest @ X: *u16, value: u32, digits: u8) {
 // Returns 1 if A+B held (skip intro)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn full_title_screen() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn full_title_screen() -> u8 {
     set_bright(0);
     oam_clear();
 
@@ -135,9 +143,9 @@ fn full_title_screen() -> u8 {
     title_set_rect(POS!(16, 17), 12, 3, 0x18D | BG_PAL!(5), 25);
 
     // Display text
-    put_str(&nametable1[POS!(4, 2)] as *u16, "SCORE:000000" as far *u8);
-    put_str(&nametable1[POS!(17, 2)] as *u16, "BEST:000000" as far *u8);
-    put_str(&nametable1[POS!(8, 26)] as *u16, "@2012 BUBBLEZAP" as far *u8);
+    put_str(&nametable1[POS!(4, 2)] as *u16, &str_score as far *u8);
+    put_str(&nametable1[POS!(17, 2)] as *u16, &str_best as far *u8);
+    put_str(&nametable1[POS!(8, 26)] as *u16, &str_copyright as far *u8);
 
     // Show scores
     put_num(&nametable1[POS!(10, 2)] as *u16, game_score, 6);
@@ -264,25 +272,29 @@ fn full_title_screen() -> u8 {
 // FUNCTION: Delay for N frames
 // ============================================================================
 
-#[mode(m8, x8)]
-fn delay(frames @ A: u8) {
-    let n: u8 = frames;
-    loop {
-        if n == 0 {
-            break;
-        }
-        nmi_wait();
-        n--;
-    }
-}
+// delay() is now provided by sneslib.r65
 
 
 // ============================================================================
 // FUNCTION: Level Start Cutscene (How High Can You Get)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn cutscene_level() {
+// Static arrays for cutscene animation (compiler doesn't support stack arrays with initializers)
+#[lowram]
+static mut stack_y: [i16; 4];
+#[lowram]
+static mut stack_ty: [i16; 4];
+#[lowram]
+static mut stack_dy: [i16; 4];
+#[lowram]
+static mut stack_frame: [u8; 4];
+#[lowram]
+static mut stack_jump: [u8; 4];
+#[lowram]
+static mut stack_delay: [u8; 4];
+
+#[mode(m16, x16, transition=inline)]
+far fn cutscene_level() {
     set_bright(0);
     oam_clear();
 
@@ -313,7 +325,7 @@ fn cutscene_level() {
         put_str(&nametable1[POS!(5, 5)] as *u16, &height_str_100 as far *u8);
     }
 
-    put_str(&nametable1[POS!(5, 25)] as *u16, "HOW HIGH CAN YOU GET ?" as far *u8);
+    put_str(&nametable1[POS!(5, 25)] as *u16, &str_how_high as far *u8);
 
     update_nametables();
     setup_palettes();
@@ -336,12 +348,14 @@ fn cutscene_level() {
     // TODO: spc_volume(global_volume);
 
     // Simple animation: Kong drops in from above
-    let stack_y: [i16; 4] = [-512, -512, -512, -512];
-    let stack_ty: [i16; 4] = [160, 120, 80, 40];
-    let stack_dy: [i16; 4] = [0, 0, 0, 0];
-    let stack_frame: [u8; 4] = [0, 0, 0, 0];
-    let stack_jump: [u8; 4] = [0, 0, 0, 0];
-    let stack_delay: [u8; 4] = [0, 25, 50, 75];
+    // Initialize local arrays (using static storage for array data)
+    // Note: Compiler doesn't support stack-allocated arrays with initializers
+    stack_y[0] = -512; stack_y[1] = -512; stack_y[2] = -512; stack_y[3] = -512;
+    stack_ty[0] = 160; stack_ty[1] = 120; stack_ty[2] = 80; stack_ty[3] = 40;
+    stack_dy[0] = 0; stack_dy[1] = 0; stack_dy[2] = 0; stack_dy[3] = 0;
+    stack_frame[0] = 0; stack_frame[1] = 0; stack_frame[2] = 0; stack_frame[3] = 0;
+    stack_jump[0] = 0; stack_jump[1] = 0; stack_jump[2] = 0; stack_jump[3] = 0;
+    stack_delay[0] = 0; stack_delay[1] = 25; stack_delay[2] = 50; stack_delay[3] = 75;
 
     let frame: u16 = 0;
     loop {
@@ -375,7 +389,8 @@ fn cutscene_level() {
 
                 if stack_y[j] >= stack_ty[j] {
                     stack_y[j] = stack_ty[j];
-                    stack_dy[j] = 0 - (stack_dy[j] / 3);
+                    // Bounce: reverse velocity and dampen by 1/3
+                    stack_dy[j] = 0 - (div8(stack_dy[j] as u8, 3) as i16);
                     stack_jump[j]++;
                 }
             }
@@ -417,8 +432,8 @@ fn cutscene_level() {
 // FUNCTION: Intro Cutscene (Kong climbs with princess)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn cutscene_intro() {
+#[mode(m16, x16, transition=inline)]
+far fn cutscene_intro() {
     game_flip = 0;
 
     set_bright(0);
@@ -494,7 +509,7 @@ fn cutscene_intro() {
     }
 
     // Kong jumps and releases princess
-    let ky: i16 = kong_y << 6;
+    let ky: i16 = (kong_y as i16) << 6;
     let kdy: i16 = -64;
     let hold: u8 = TRUE;
 
@@ -614,8 +629,8 @@ fn cutscene_intro() {
 // FUNCTION: Level Clear Cutscene (Simplified)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn cutscene_levels_clear() {
+#[mode(m16, x16, transition=inline)]
+far fn cutscene_levels_clear() {
     game_flip = 0;
 
     set_bright(0);
@@ -670,7 +685,7 @@ fn cutscene_levels_clear() {
     let frame: u16 = 0;
     let fall_start: u8 = FALSE;
     let fall_ground: u8 = FALSE;
-    let ky: i16 = 23 << 6;
+    let ky: i16 = (23 as i16) << 6;
     let kdy: i16 = 0;
 
     loop {
@@ -726,7 +741,7 @@ fn cutscene_levels_clear() {
 
         // Mario and princess walk toward each other
         if frame > 480 {
-            if frame % 3 == 0 {
+            if mod16(frame, 3) == 0 {
                 if princess_x < 96 {
                     princess_x++;
                 }
@@ -765,8 +780,8 @@ fn cutscene_levels_clear() {
 // FUNCTION: Next Level Cutscene (Kong grabs princess)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn cutscene_next_level() {
+#[mode(m16, x16, transition=inline)]
+far fn cutscene_next_level() {
     // Show heart
     // TODO: sfx_play(SFX_CHN, SFX_HEART, player_x);
 

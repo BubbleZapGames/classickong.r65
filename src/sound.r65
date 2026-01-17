@@ -107,8 +107,8 @@ const MUS_VICTORY: u8 = 8;
 // FUNCTION: Send Command to SPC700
 // ============================================================================
 
-#[mode(m8, x8)]
-fn spc_command(command @ A: u16, param: u16) {
+#[mode(m16, x16, transition=inline)]
+far fn spc_command(command @ A: u16, param: u16) {
     // Write command with sync byte
     let cmd: u16 = command | (snes_spc_sync as u16);
 
@@ -137,8 +137,8 @@ fn spc_command(command @ A: u16, param: u16) {
 // FUNCTION: Set Stereo Mode
 // ============================================================================
 
-#[mode(m8, x8)]
-fn spc_stereo(stereo @ A: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn spc_stereo(stereo @ A: u8) {
     snes_spc_stereo = stereo;
     spc_command(SCMD_STEREO, stereo as u16);
 }
@@ -148,8 +148,8 @@ fn spc_stereo(stereo @ A: u8) {
 // FUNCTION: Set Global Volume
 // ============================================================================
 
-#[mode(m8, x8)]
-fn spc_volume(volume @ A: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn spc_volume(volume @ A: u8) {
     let vol: u8 = volume;
     if vol > 127 {
         vol = 127;
@@ -163,8 +163,8 @@ fn spc_volume(volume @ A: u8) {
 // FUNCTION: Stop Music
 // ============================================================================
 
-#[mode(m8, x8)]
-fn music_stop() {
+#[mode(m16, x16, transition=inline)]
+far fn music_stop() {
     spc_command(SCMD_MUSIC_STOP, 0);
 }
 
@@ -173,8 +173,8 @@ fn music_stop() {
 // FUNCTION: Start Music
 // ============================================================================
 
-#[mode(m8, x8)]
-fn music_start() {
+#[mode(m16, x16, transition=inline)]
+far fn music_start() {
     spc_command(SCMD_MUSIC_PLAY, 0);
 }
 
@@ -183,8 +183,8 @@ fn music_start() {
 // FUNCTION: Upload Data to SPC700 Using IPL Loader
 // ============================================================================
 
-#[mode(m8, x16)]
-fn spc_load_data(adr @ X: u16, src: far *u8, size: u16) {
+#[mode(m8, x16, transition=inline)]
+far fn spc_load_data(adr @ X: u16, src: far *u8, size: u16) {
     // Disable NMI during transfer
     NMITIMEN = 0;
 
@@ -259,8 +259,8 @@ fn spc_load_data(adr @ X: u16, src: far *u8, size: u16) {
 // FUNCTION: Initialize Sound System
 // ============================================================================
 
-#[mode(m8, x8)]
-fn spc_setup() {
+#[mode(m8, x16, transition=inline)]
+far fn spc_setup() {
     snes_spc_stereo = 0;
     snes_spc_volume = 127;
 
@@ -273,8 +273,8 @@ fn spc_setup() {
 // FUNCTION: Load Music Track
 // ============================================================================
 
-#[mode(m8, x8)]
-fn spc_load_music(data @ X: far *u8, size: u16) {
+#[mode(m16, x16, transition=inline)]
+far fn spc_load_music(data @ X: far *u8, size: u16) {
     spc_command(SCMD_RELOAD, 0);
     spc_load_data(0xE000, data, size);
     spc_stereo(snes_spc_stereo);
@@ -286,8 +286,8 @@ fn spc_load_music(data @ X: far *u8, size: u16) {
 // FUNCTION: Play Sound Effect
 // ============================================================================
 
-#[mode(m8, x8)]
-fn sfx_play(chn @ A: u8, sfx: u8, pan: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn sfx_play(chn @ A: u8, sfx: u8, pan: u8) {
     let cmd: u16 = SCMD_SFX_PLAY | ((chn as u16) << 8);
     let param: u16 = (sfx as u16) | ((pan as u16) << 8);
     spc_command(cmd, param);
@@ -298,8 +298,8 @@ fn sfx_play(chn @ A: u8, sfx: u8, pan: u8) {
 // FUNCTION: Play Music Track
 // ============================================================================
 
-#[mode(m8, x8)]
-fn music_play(mus @ A: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn music_play(mus @ A: u8) {
     let music_data: far *u8;
     let music_size: u16;
 

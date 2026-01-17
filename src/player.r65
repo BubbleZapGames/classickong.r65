@@ -82,6 +82,8 @@ const PLR_BBOX_HWDT: u8 = 2;  // Half width of player bounding box
 const DIR_NONE: u8 = 0;
 const DIR_LEFT: u8 = 1;
 const DIR_RIGHT: u8 = 2;
+const DIR_UP: u8 = 3;
+const DIR_DOWN: u8 = 4;
 
 
 // ============================================================================
@@ -158,7 +160,7 @@ static player_jump_table: [i8; 53] = [
     1, 0, 1, 0, 1, 0, 1, 0,      // Slow fall (8 frames)
     1, 1, 1, 1, 1,               // Faster fall (5 frames)
     1, 1, 1, 1, 1,               // Continue fall (5 frames)
-    1, 1, 1, 1, 1, 1, 1, 1       // Extra fall frames (8 frames)
+    1, 1, 1, 1, 1, 1, 1, 1, 1    // Extra fall frames (9 frames)
 ];
 
 const JUMP_TABLE_SIZE: u8 = 53;
@@ -204,8 +206,8 @@ macro_rules! NAM_OFF($x:expr, $y:expr) { ((($y as u16) >> 3) << 5) + (($x as u16
 // FUNCTION: Test Walkmap at Pixel Position
 // ============================================================================
 
-#[mode(m8, x16)]
-fn test_map(x @ A: u8, y @ X: u8) -> u8 {
+#[mode(m8, x16, transition=inline)]
+far fn test_map(x @ A: u8, y @ X: u8) -> u8 {
     let offset: u16 = WMAP_OFF!(x, X);
     return walkmap[offset];
 }
@@ -215,8 +217,8 @@ fn test_map(x @ A: u8, y @ X: u8) -> u8 {
 // FUNCTION: Initialize Player
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_init() {
+#[mode(m16, x16, transition=inline)]
+far fn player_init() {
     player_x = 32;
     player_y = 192;
     player_dir = DIR_RIGHT;
@@ -247,8 +249,8 @@ fn player_init() {
 // Returns 0 if should skip this frame, non-zero if should move
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_horz_div(n @ A: u8) -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn player_horz_div(n @ A: u8) -> u8 {
     player_speed_div++;
 
     if player_speed_div >= n {
@@ -264,8 +266,8 @@ fn player_horz_div(n @ A: u8) -> u8 {
 // Returns 1 if should move, 0 if should skip
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_ladder_div() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn player_ladder_div() -> u8 {
     player_speed_div++;
 
     if player_speed_div >= 3 {
@@ -284,8 +286,8 @@ fn player_ladder_div() -> u8 {
 // FUNCTION: Get Left Clip Boundary
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_clip_left() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn player_clip_left() -> u8 {
     // Near Kong platform on levels 0-2, if not flipped
     if game_level < 3 {
         if player_y <= 40 {
@@ -302,8 +304,8 @@ fn player_clip_left() -> u8 {
 // FUNCTION: Get Right Clip Boundary
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_clip_right() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn player_clip_right() -> u8 {
     // Near Kong platform on levels 0-2, if flipped
     if game_level < 3 {
         if player_y <= 40 {
@@ -320,8 +322,8 @@ fn player_clip_right() -> u8 {
 // FUNCTION: Process Player Movement (Ground/Walking)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_process_ground(pad @ A: u16) {
+#[mode(m16, x16, transition=inline)]
+far fn player_process_ground(pad @ A: u16) {
     let floor1: u8;
     let floor2: u8;
 
@@ -351,10 +353,10 @@ fn player_process_ground(pad @ A: u16) {
 
     // Update walk animation based on direction
     if player_dir == DIR_LEFT {
-        let frame: u8 = (player_step >> 2) % 6;
+        let frame: u8 = mod8((player_step >> 2) as u8, 6);
         player_anim = player_walk_anim_left[frame];
     } else if player_dir == DIR_RIGHT {
-        let frame: u8 = (player_step >> 2) % 6;
+        let frame: u8 = mod8((player_step >> 2) as u8, 6);
         player_anim = player_walk_anim_right[frame];
     }
 }
@@ -364,8 +366,8 @@ fn player_process_ground(pad @ A: u16) {
 // FUNCTION: Check and Start Climbing Ladder
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_check_ladder(pad @ A: u16) {
+#[mode(m16, x16, transition=inline)]
+far fn player_check_ladder(pad @ A: u16) {
     let floor1: u8;
     let floor2: u8;
 
@@ -408,8 +410,8 @@ fn player_check_ladder(pad @ A: u16) {
 // FUNCTION: Process Ladder Climbing
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_process_ladder(pad @ A: u16) {
+#[mode(m16, x16, transition=inline)]
+far fn player_process_ladder(pad @ A: u16) {
     let floor1: u8;
     let x: u8 = player_x + 7;
     let anim: u8 = FALSE;
@@ -480,8 +482,8 @@ fn player_process_ladder(pad @ A: u16) {
 // Returns collision flags (T_SOLID bits)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_check_floor() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn player_check_floor() -> u8 {
     let left: u8 = test_map(player_x + 8 - PLR_BBOX_HWDT, player_y + 16);
     let right: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16);
     return left | right;
@@ -493,8 +495,8 @@ fn player_check_floor() -> u8 {
 // Returns LEVEL_LOSE if fell too far, 0 otherwise
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_process_fall() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn player_process_fall() -> u8 {
     let floor1: u8 = player_check_floor();
 
     if (floor1 & T_SOLID) == 0 {
@@ -535,8 +537,8 @@ fn player_process_fall() -> u8 {
 // FUNCTION: Push Player Out of Solid Floor (for slopes/elevators)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_push_out_of_floor() {
+#[mode(m16, x16, transition=inline)]
+far fn player_push_out_of_floor() {
     let y: u8 = player_y + 15;
     let left: u8;
     let right: u8;
@@ -559,8 +561,8 @@ fn player_push_out_of_floor() {
 // FUNCTION: Process Jump
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_process_jump(pad @ A: u16) {
+#[mode(m16, x16, transition=inline)]
+far fn player_process_jump(pad @ A: u16) {
     let dy: i8;
     let floor1: u8;
 
@@ -640,8 +642,8 @@ fn player_process_jump(pad @ A: u16) {
 // FUNCTION: Process Airborne Movement (while jumping or falling)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_process_airborne() {
+#[mode(m16, x16, transition=inline)]
+far fn player_process_airborne() {
     // Play fall sound after a few frames
     if player_jump != JUMP_AIR {
         if player_fall_sound < 2 {
@@ -686,8 +688,8 @@ fn player_process_airborne() {
 // FUNCTION: Process Hammer
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_process_hammer() {
+#[mode(m16, x16, transition=inline)]
+far fn player_process_hammer() {
     if player_hammer_time == 0 {
         // Hide hammer sprites
         oam_spr1(0, 240, 0, OAM_HAMMER);
@@ -734,8 +736,8 @@ fn player_process_hammer() {
 // FUNCTION: Update Player Sprite in OAM
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_update_oam() {
+#[mode(m16, x16, transition=inline)]
+far fn player_update_oam() {
     oam_spr1(player_x, player_y - 1, player_anim, OAM_PLAYER);
 }
 
@@ -745,8 +747,8 @@ fn player_update_oam() {
 // Returns: 0 = OK, LEVEL_LOSE = player died
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_update(pad @ A: u16) -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn player_update(pad @ A: u16) -> u8 {
     let result: u8 = 0;
 
     // Handle rivet delay countdown
@@ -808,8 +810,8 @@ fn player_update(pad @ A: u16) -> u8 {
 // FUNCTION: Play Player Death Animation
 // ============================================================================
 
-#[mode(m8, x8)]
-fn player_death_animation() {
+#[mode(m16, x16, transition=inline)]
+far fn player_death_animation() {
     let frame: u8 = 0;
     let counter: u8 = 0;
 

@@ -259,8 +259,8 @@ static bounce_speed: [i16; 10] = [
 // FUNCTION: Clear Enemy List
 // ============================================================================
 
-#[mode(m8, x16)]
-fn enemy_clear() {
+#[mode(m8, x16, transition=inline)]
+far fn enemy_clear() {
     // Clear all enemy types
     X = 0;
     loop {
@@ -292,8 +292,8 @@ fn enemy_clear() {
 // Returns TRUE if successful, FALSE if no room
 // ============================================================================
 
-#[mode(m8, x8)]
-fn enemy_add(etype @ A: u8, ex: u8, ey: u8, edx: i8) -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn enemy_add(etype @ A: u8, ex: u8, ey: u8, edx: i8) -> u8 {
     let i: u8 = enemy_free;
     let j: u8 = 0;
 
@@ -388,8 +388,8 @@ fn enemy_add(etype @ A: u8, ex: u8, ey: u8, edx: i8) -> u8 {
 // Returns TRUE if should spawn fireball (barrel hit fire)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn enemy_remove(i @ A: u8, destroy: u8) -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn enemy_remove(i @ A: u8, destroy: u8) -> u8 {
     let fire: u8 = FALSE;
 
     // Hide sprite
@@ -439,8 +439,8 @@ fn enemy_remove(i @ A: u8, destroy: u8) -> u8 {
 // Returns TRUE if player jumped over enemy
 // ============================================================================
 
-#[mode(m8, x8)]
-fn enemy_check_object_jump(ox @ A: u8, oy @ X: u8) -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn enemy_check_object_jump(ox @ A: u8, oy @ X: u8) -> u8 {
     // Check if enemy is below player and player is jumping
     if oy >= player_y + 12 {
         if oy < player_jump_y + 8 {
@@ -463,8 +463,8 @@ fn enemy_check_object_jump(ox @ A: u8, oy @ X: u8) -> u8 {
 // FUNCTION: Process Rolling Barrel
 // ============================================================================
 
-#[mode(m8, x8)]
-fn process_rolling_barrel(i @ A: u8, spr @ X: u16) -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn process_rolling_barrel(i @ A: u8, spr @ X: u16) -> u8 {
     let ox: u8 = enemy_x[i];
     let oy: u8 = enemy_y[i];
     let sy: u8;
@@ -592,8 +592,8 @@ fn process_rolling_barrel(i @ A: u8, spr @ X: u16) -> u8 {
 // FUNCTION: Process Ladder Barrel
 // ============================================================================
 
-#[mode(m8, x8)]
-fn process_ladder_barrel(i @ A: u8, spr @ X: u16) {
+#[mode(m16, x16, transition=inline)]
+far fn process_ladder_barrel(i @ A: u8, spr @ X: u16) {
     let ox: u8 = enemy_x[i];
     let oy: u8 = enemy_y[i];
 
@@ -627,8 +627,8 @@ fn process_ladder_barrel(i @ A: u8, spr @ X: u16) {
 // FUNCTION: Process Wild Barrel
 // ============================================================================
 
-#[mode(m8, x8)]
-fn process_wild_barrel(i @ A: u8, spr @ X: u16, etype: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn process_wild_barrel(i @ A: u8, spr @ X: u16, etype: u8) {
     let ox: u8 = enemy_x[i];
     let oy: u8 = enemy_y[i];
 
@@ -690,8 +690,8 @@ fn process_wild_barrel(i @ A: u8, spr @ X: u16, etype: u8) {
 // FUNCTION: Process Fireball
 // ============================================================================
 
-#[mode(m8, x8)]
-fn process_fireball(i @ A: u8, spr @ X: u16, etype: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn process_fireball(i @ A: u8, spr @ X: u16, etype: u8) {
     let ox: u8 = enemy_x[i];
     let oy: u8 = enemy_y[i];
     let dx: i8 = enemy_dx[i];
@@ -773,7 +773,7 @@ fn process_fireball(i @ A: u8, spr @ X: u16, etype: u8) {
                     }
                 } else {
                     // Random direction
-                    let r: u8 = ((rand() as u8) & 31) / 12;
+                    let r: u8 = div8((rand() as u8) & 31, 12);
                     enemy_dx[i] = (r as i8) - 1;
                     if enemy_dx[i] == 0 {
                         enemy_cnt[i] = (enemy_cnt[i] & 7) + 1;
@@ -788,7 +788,7 @@ fn process_fireball(i @ A: u8, spr @ X: u16, etype: u8) {
                 if (ladder_down & T_LADDER) != 0 {
                     let val: u8;
                     if player_y > oy {
-                        val = 64 + game_loops * 16;
+                        val = 64 + (game_loops << 4);
                     } else {
                         val = 64;
                     }
@@ -802,7 +802,7 @@ fn process_fireball(i @ A: u8, spr @ X: u16, etype: u8) {
                 if (ladder_up & T_LADDER) != 0 && oy > 40 {
                     let val: u8;
                     if player_y < oy {
-                        val = 64 + game_loops * 16;
+                        val = 64 + (game_loops << 4);
                     } else {
                         val = 64;
                     }
@@ -840,8 +840,8 @@ fn process_fireball(i @ A: u8, spr @ X: u16, etype: u8) {
 // FUNCTION: Process Bounce Enemy
 // ============================================================================
 
-#[mode(m8, x8)]
-fn process_bounce(i @ A: u8, spr @ X: u16) -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn process_bounce(i @ A: u8, spr @ X: u16) -> u8 {
     let ox: u8 = (enemy_ix[i] >> BOUNCE_FP) as u8;
     let oy: u8 = (enemy_iy[i] >> BOUNCE_FP) as u8;
 
@@ -915,8 +915,8 @@ fn process_bounce(i @ A: u8, spr @ X: u16) -> u8 {
 // Returns TRUE if collision detected
 // ============================================================================
 
-#[mode(m8, x8)]
-fn enemy_check_player_collision(ox @ A: u8, oy @ X: u8) -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn enemy_check_player_collision(ox @ A: u8, oy @ X: u8) -> u8 {
     // Alternating frame collision checks
     if (game_frame_cnt & 1) != 0 {
         if player_y + 12 > oy + 4 {
@@ -938,8 +938,8 @@ fn enemy_check_player_collision(ox @ A: u8, oy @ X: u8) -> u8 {
 // Returns TRUE if hammer hit enemy
 // ============================================================================
 
-#[mode(m8, x8)]
-fn enemy_check_hammer_collision(i @ A: u8, ox: u8, oy: u8) -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn enemy_check_hammer_collision(i @ A: u8, ox: u8, oy: u8) -> u8 {
     // Check if hammer is active and player is grounded
     if player_hammer_time == 0 {
         return FALSE;
@@ -987,8 +987,8 @@ fn enemy_check_hammer_collision(i @ A: u8, ox: u8, oy: u8) -> u8 {
 // Returns LEVEL_LOSE if player killed, 0 otherwise
 // ============================================================================
 
-#[mode(m8, x8)]
-fn enemy_process() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn enemy_process() -> u8 {
     let clear: u8 = 0;
     let fire: u8 = FALSE;
     let spr: u16 = OAM_ENEMY;
@@ -1125,8 +1125,8 @@ fn enemy_process() -> u8 {
 // Returns TRUE if splat animation is active (pauses gameplay)
 // ============================================================================
 
-#[mode(m8, x8)]
-fn process_splat() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn process_splat() -> u8 {
     if splat_cnt < SPLAT_ANIM_SIZE {
         oam_spr1(splat_x, splat_y, splat_anim[splat_cnt >> 1], OAM_SPLAT);
         splat_cnt++;
@@ -1142,8 +1142,8 @@ fn process_splat() -> u8 {
 // FUNCTION: Initialize Enemy System
 // ============================================================================
 
-#[mode(m8, x8)]
-fn enemy_init() {
+#[mode(m16, x16, transition=inline)]
+far fn enemy_init() {
     enemy_clear();
     game_fireballs = 0;
     game_fireballs_max = 5;

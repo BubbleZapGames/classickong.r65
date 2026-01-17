@@ -125,8 +125,8 @@ static item_sprite_table: [u16; 5] = [
 // FUNCTION: Clear Particle
 // ============================================================================
 
-#[mode(m8, x8)]
-fn particle_clear(id @ A: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn particle_clear(id @ A: u8) {
     particle_type[id] = PART_TYPE_NONE;
     oam_spr1(0, 240, 0, OAM_PARTICLES + ((id as u16) << 2));
     particle_free = id;
@@ -137,8 +137,8 @@ fn particle_clear(id @ A: u8) {
 // FUNCTION: Clear All Particles
 // ============================================================================
 
-#[mode(m8, x8)]
-fn particles_clear() {
+#[mode(m16, x16, transition=inline)]
+far fn particles_clear() {
     let i: u8 = 0;
     loop {
         particle_type[i] = PART_TYPE_NONE;
@@ -155,8 +155,8 @@ fn particles_clear() {
 // FUNCTION: Add Particle
 // ============================================================================
 
-#[mode(m8, x8)]
-fn particle_add(ptype @ A: u8, px: u8, py: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn particle_add(ptype @ A: u8, px: u8, py: u8) {
     let i: u8 = particle_free;
     let j: u8 = 0;
     let cnt1: u8 = 0;
@@ -222,8 +222,8 @@ fn particle_add(ptype @ A: u8, px: u8, py: u8) {
 // FUNCTION: Process Particles
 // ============================================================================
 
-#[mode(m8, x8)]
-fn particle_process() {
+#[mode(m16, x16, transition=inline)]
+far fn particle_process() {
     let spr: u16 = OAM_PARTICLES;
     let frame: u8 = game_frame_cnt as u8;
     let i: u8 = 0;
@@ -337,8 +337,8 @@ fn particle_process() {
 // FUNCTION: Clear All Items
 // ============================================================================
 
-#[mode(m8, x8)]
-fn items_clear() {
+#[mode(m16, x16, transition=inline)]
+far fn items_clear() {
     let i: u8 = 0;
     loop {
         item_type[i] = ITEM_NONE;
@@ -356,8 +356,8 @@ fn items_clear() {
 // FUNCTION: Add Item
 // ============================================================================
 
-#[mode(m8, x8)]
-fn game_item_add(x @ A: u8, y: u8, itype: u8) {
+#[mode(m16, x16, transition=inline)]
+far fn game_item_add(x @ A: u8, y: u8, itype: u8) {
     if items_all >= ITEMS_MAX {
         return;
     }
@@ -374,8 +374,8 @@ fn game_item_add(x @ A: u8, y: u8, itype: u8) {
 // FUNCTION: Draw Items
 // ============================================================================
 
-#[mode(m8, x8)]
-fn items_draw() {
+#[mode(m16, x16, transition=inline)]
+far fn items_draw() {
     let spr: u16 = OAM_ITEMS;
     let i: u8 = 0;
 
@@ -402,8 +402,8 @@ fn items_draw() {
 // Returns TRUE if animation should pause
 // ============================================================================
 
-#[mode(m8, x8)]
-fn items_check_collision() -> u8 {
+#[mode(m16, x16, transition=inline)]
+far fn items_check_collision() -> u8 {
     let anim: u8 = FALSE;
     let i: u8 = 0;
 
@@ -483,8 +483,8 @@ fn items_check_collision() -> u8 {
 // FUNCTION: Clear All Elevators
 // ============================================================================
 
-#[mode(m8, x8)]
-fn elevators_clear() {
+#[mode(m16, x16, transition=inline)]
+far fn elevators_clear() {
     let i: u8 = 0;
     loop {
         elevator_x[i] = 0;
@@ -506,8 +506,8 @@ fn elevators_clear() {
 // FUNCTION: Add Elevator
 // ============================================================================
 
-#[mode(m8, x8)]
-fn elevator_add(x @ A: u8, y: u8, dy: i8) {
+#[mode(m16, x16, transition=inline)]
+far fn elevator_add(x @ A: u8, y: u8, dy: i8) {
     if elevators_all >= ELEVATORS_MAX {
         return;
     }
@@ -524,8 +524,8 @@ fn elevator_add(x @ A: u8, y: u8, dy: i8) {
 // FUNCTION: Process Elevators
 // ============================================================================
 
-#[mode(m8, x16)]
-fn elevators_process() {
+#[mode(m8, x16, transition=inline)]
+far fn elevators_process() {
     let spr: u16 = OAM_ELEVATORS;
     let i: u8 = 0;
 
@@ -589,8 +589,8 @@ fn elevators_process() {
 // FUNCTION: Initialize Item/Particle System
 // ============================================================================
 
-#[mode(m8, x8)]
-fn items_init() {
+#[mode(m16, x16, transition=inline)]
+far fn items_init() {
     items_clear();
     particles_clear();
     elevators_clear();
