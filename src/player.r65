@@ -1,0 +1,838 @@
+// ============================================================================
+// Classic Kong Complete - Player Control System
+// ============================================================================
+// Handles player movement, jumping, climbing, collision, and hammer
+// ============================================================================
+
+// ============================================================================
+// PLAYER STATE VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut player_x: u8;
+
+#[lowram]
+static mut player_y: u8;
+
+#[lowram]
+static mut player_dir: u8;
+
+#[lowram]
+static mut player_dir_prev: u8;
+
+#[lowram]
+static mut player_step: u8;
+
+#[lowram]
+static mut player_anim: u16;
+
+#[lowram]
+static mut player_jump: u8;
+
+#[lowram]
+static mut player_jump_cnt: u8;
+
+#[lowram]
+static mut player_jump_y: u8;
+
+#[lowram]
+static mut player_fall: u8;
+
+#[lowram]
+static mut player_fall_sound: u8;
+
+#[lowram]
+static mut player_ladder: u8;
+
+#[lowram]
+static mut player_speed_div: u8;
+
+#[lowram]
+static mut player_rivet_delay: u8;
+
+
+// ============================================================================
+// HAMMER VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut player_hammer_time: u16;
+
+#[lowram]
+static mut player_hammer_phase: u8;
+
+#[lowram]
+static mut player_hammer_cnt: u8;
+
+
+// ============================================================================
+// CONSTANTS - Player Movement
+// ============================================================================
+
+const CLIP_LEFT: u8 = 2;
+const CLIP_RIGHT: u8 = 238;
+const MAX_FALL_HEIGHT: u8 = 15;
+const PLR_BBOX_HWDT: u8 = 2;  // Half width of player bounding box
+
+
+// ============================================================================
+// CONSTANTS - Direction
+// ============================================================================
+
+const DIR_NONE: u8 = 0;
+const DIR_LEFT: u8 = 1;
+const DIR_RIGHT: u8 = 2;
+
+
+// ============================================================================
+// CONSTANTS - Jump State
+// ============================================================================
+
+const JUMP_NONE: u8 = 0;
+const JUMP_AIR: u8 = 1;
+const JUMP_LAND: u8 = 2;
+const JUMP_DUMMY: u8 = 3;
+
+
+// ============================================================================
+// ANIMATION TABLES - Walking (6 frames each)
+// ============================================================================
+
+static player_walk_anim_left: [u16; 6] = [
+    PLAYER_TILE + 0x00 | PLAYER_ATR,
+    PLAYER_TILE + 0x02 | PLAYER_ATR,
+    PLAYER_TILE + 0x00 | PLAYER_ATR,
+    PLAYER_TILE + 0x04 | PLAYER_ATR,
+    PLAYER_TILE + 0x06 | PLAYER_ATR,
+    PLAYER_TILE + 0x04 | PLAYER_ATR
+];
+
+static player_walk_anim_right: [u16; 6] = [
+    PLAYER_TILE + 0x00 | PLAYER_ATR | SPR_HFLIP,
+    PLAYER_TILE + 0x02 | PLAYER_ATR | SPR_HFLIP,
+    PLAYER_TILE + 0x00 | PLAYER_ATR | SPR_HFLIP,
+    PLAYER_TILE + 0x04 | PLAYER_ATR | SPR_HFLIP,
+    PLAYER_TILE + 0x06 | PLAYER_ATR | SPR_HFLIP,
+    PLAYER_TILE + 0x04 | PLAYER_ATR | SPR_HFLIP
+];
+
+
+// ============================================================================
+// ANIMATION TABLES - Climbing (8 frames: 2 per ladder position)
+// ============================================================================
+
+static player_climb_anim: [u16; 8] = [
+    PLAYER_TILE + 0x20 | PLAYER_ATR,
+    PLAYER_TILE + 0x20 | PLAYER_ATR | SPR_HFLIP,
+    PLAYER_TILE + 0x22 | PLAYER_ATR,
+    PLAYER_TILE + 0x22 | PLAYER_ATR | SPR_HFLIP,
+    PLAYER_TILE + 0x24 | PLAYER_ATR,
+    PLAYER_TILE + 0x24 | PLAYER_ATR | SPR_HFLIP,
+    PLAYER_TILE + 0x26 | PLAYER_ATR,
+    PLAYER_TILE + 0x26 | PLAYER_ATR | SPR_HFLIP
+];
+
+
+// ============================================================================
+// ANIMATION TABLES - Lose/Death (4 frames)
+// ============================================================================
+
+static player_lose_anim: [u16; 4] = [
+    PLAYER_TILE + 0x2A | PLAYER_ATR,
+    PLAYER_TILE + 0x2C | PLAYER_ATR,
+    PLAYER_TILE + 0x2A | PLAYER_ATR | SPR_VFLIP,
+    PLAYER_TILE + 0x2C | PLAYER_ATR | SPR_HFLIP
+];
+
+
+// ============================================================================
+// JUMP TABLE - Y velocity per frame (45 frames total)
+// Negative = up, Positive = down
+// ============================================================================
+
+static player_jump_table: [i8; 53] = [
+    -1, -1, -1, -1, -1,          // Fast rise (5 frames)
+    -1, -1, -1, -1, -1,          // Continue rise (5 frames)
+    0, -1, 0, -1, 0, -1, 0, -1,  // Slow rise (8 frames)
+    0, 0, 0, 0, 0, 0, 0, 0,      // Apex (8 frames)
+    1, 0, 1, 0, 1, 0, 1, 0,      // Slow fall (8 frames)
+    1, 1, 1, 1, 1,               // Faster fall (5 frames)
+    1, 1, 1, 1, 1,               // Continue fall (5 frames)
+    1, 1, 1, 1, 1, 1, 1, 1       // Extra fall frames (8 frames)
+];
+
+const JUMP_TABLE_SIZE: u8 = 53;
+
+
+// ============================================================================
+// HAMMER ANIMATION TABLES
+// ============================================================================
+
+// X and Y offsets for hammer sprite relative to player
+static hammer_offsets: [i8; 8] = [
+    -16,  -1,   // Phase 0: Hammer at left
+      0, -17,   // Phase 1: Hammer at top
+     16,  -1,   // Phase 2: Hammer at right
+      0, -17    // Phase 3: Hammer at top
+];
+
+// Tile numbers for hammer sprites (2 sprites per phase)
+static hammer_sprites: [u16; 8] = [
+    PLAYER_TILE + 0x40 | PLAYER_ATR,              // Phase 0: Left
+    PLAYER_TILE + 0x42 | PLAYER_ATR,
+    PLAYER_TILE + 0x44 | PLAYER_ATR,              // Phase 1: Top
+    PLAYER_TILE + 0x46 | PLAYER_ATR,
+    PLAYER_TILE + 0x40 | PLAYER_ATR | SPR_HFLIP,  // Phase 2: Right
+    PLAYER_TILE + 0x42 | PLAYER_ATR | SPR_HFLIP,
+    PLAYER_TILE + 0x44 | PLAYER_ATR | SPR_HFLIP,  // Phase 3: Top
+    PLAYER_TILE + 0x46 | PLAYER_ATR | SPR_HFLIP
+];
+
+
+// ============================================================================
+// WALKMAP ACCESS MACROS
+// ============================================================================
+
+// Get walkmap offset from pixel coordinates
+macro_rules! WMAP_OFF($x:expr, $y:expr) { ((($y as u16) << 5) + (($x as u16) >> 3)) }
+
+// Get nametable offset from pixel coordinates
+macro_rules! NAM_OFF($x:expr, $y:expr) { ((($y as u16) >> 3) << 5) + (($x as u16) >> 3) }
+
+
+// ============================================================================
+// FUNCTION: Test Walkmap at Pixel Position
+// ============================================================================
+
+#[mode(m8, x16)]
+fn test_map(x @ A: u8, y @ X: u8) -> u8 {
+    let offset: u16 = WMAP_OFF!(x, X);
+    return walkmap[offset];
+}
+
+
+// ============================================================================
+// FUNCTION: Initialize Player
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_init() {
+    player_x = 32;
+    player_y = 192;
+    player_dir = DIR_RIGHT;
+    player_dir_prev = DIR_RIGHT;
+    player_step = 0;
+    player_jump = JUMP_NONE;
+    player_jump_cnt = 0;
+    player_fall = FALSE;
+    player_fall_sound = 0;
+    player_ladder = FALSE;
+    player_speed_div = 0;
+    player_rivet_delay = 0;
+    player_hammer_time = 0;
+    player_hammer_phase = 0;
+    player_hammer_cnt = 0;
+
+    // Set initial animation
+    if game_flip == 0 {
+        player_anim = player_walk_anim_right[0];
+    } else {
+        player_anim = player_walk_anim_left[0];
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Horizontal Speed Divider (skip frames for slower movement)
+// Returns 0 if should skip this frame, non-zero if should move
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_horz_div(n @ A: u8) -> u8 {
+    player_speed_div++;
+
+    if player_speed_div >= n {
+        player_speed_div = 0;
+    }
+
+    return player_speed_div;
+}
+
+
+// ============================================================================
+// FUNCTION: Ladder Speed Divider (1/3 speed for climbing)
+// Returns 1 if should move, 0 if should skip
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_ladder_div() -> u8 {
+    player_speed_div++;
+
+    if player_speed_div >= 3 {
+        player_speed_div = 0;
+    }
+
+    if player_speed_div == 0 {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Get Left Clip Boundary
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_clip_left() -> u8 {
+    // Near Kong platform on levels 0-2, if not flipped
+    if game_level < 3 {
+        if player_y <= 40 {
+            if game_flip == 0 {
+                return 104;
+            }
+        }
+    }
+    return CLIP_LEFT;
+}
+
+
+// ============================================================================
+// FUNCTION: Get Right Clip Boundary
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_clip_right() -> u8 {
+    // Near Kong platform on levels 0-2, if flipped
+    if game_level < 3 {
+        if player_y <= 40 {
+            if game_flip != 0 {
+                return 256 - 104 - 16;
+            }
+        }
+    }
+    return CLIP_RIGHT;
+}
+
+
+// ============================================================================
+// FUNCTION: Process Player Movement (Ground/Walking)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_process_ground(pad @ A: u16) {
+    let floor1: u8;
+    let floor2: u8;
+
+    player_dir = DIR_NONE;
+
+    // Left movement
+    if pad & PAD_LEFT != 0 {
+        if player_x >= player_clip_left() {
+            if player_horz_div(3) != 0 {
+                player_x--;
+                player_step++;
+            }
+            player_dir = DIR_LEFT;
+        }
+    }
+
+    // Right movement
+    if pad & PAD_RIGHT != 0 {
+        if player_x <= player_clip_right() {
+            if player_horz_div(3) != 0 {
+                player_x++;
+                player_step++;
+            }
+            player_dir = DIR_RIGHT;
+        }
+    }
+
+    // Update walk animation based on direction
+    if player_dir == DIR_LEFT {
+        let frame: u8 = (player_step >> 2) % 6;
+        player_anim = player_walk_anim_left[frame];
+    } else if player_dir == DIR_RIGHT {
+        let frame: u8 = (player_step >> 2) % 6;
+        player_anim = player_walk_anim_right[frame];
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Check and Start Climbing Ladder
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_check_ladder(pad @ A: u16) {
+    let floor1: u8;
+    let floor2: u8;
+
+    // Can't climb with hammer
+    if player_hammer_time != 0 {
+        return;
+    }
+
+    // Check for UP input
+    if pad & PAD_UP != 0 {
+        floor1 = test_map(player_x + 7, player_y + 15);
+        floor2 = test_map(player_x + 9, player_y + 15);
+
+        if (floor1 & T_LADDER) != 0 {
+            if (floor2 & T_LADDER) != 0 {
+                player_ladder = TRUE;
+                // Snap to ladder center
+                player_x = (player_x & 0xF8) + 4;
+            }
+        }
+    }
+
+    // Check for DOWN input
+    if pad & PAD_DOWN != 0 {
+        floor1 = test_map(player_x + 7, player_y + 16);
+        floor2 = test_map(player_x + 9, player_y + 16);
+
+        if (floor1 & T_LADDER) != 0 {
+            if (floor2 & T_LADDER) != 0 {
+                player_ladder = TRUE;
+                // Snap to ladder center
+                player_x = (player_x & 0xF8) + 4;
+            }
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Process Ladder Climbing
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_process_ladder(pad @ A: u16) {
+    let floor1: u8;
+    let x: u8 = player_x + 7;
+    let anim: u8 = FALSE;
+    let off: u8;
+
+    // Climb UP
+    if pad & PAD_UP != 0 {
+        floor1 = test_map(x, player_y + 15);
+
+        // Check for broken ladder (can't pass)
+        if (floor1 & T_LADDER_BROKEN) == 0 {
+            if (floor1 & T_LADDER) != 0 {
+                if player_ladder_div() != 0 {
+                    player_y--;
+                    player_step++;
+                    // TODO: Add ladder sound here
+                }
+                anim = TRUE;
+            } else {
+                // Reached top of ladder
+                player_ladder = FALSE;
+            }
+        }
+    }
+
+    // Climb DOWN
+    if pad & PAD_DOWN != 0 {
+        floor1 = test_map(x, player_y + 16);
+
+        if (floor1 & T_LADDER_BROKEN) == 0 {
+            if (floor1 & T_LADDER) != 0 {
+                if player_ladder_div() != 0 {
+                    player_y++;
+                    player_step++;
+                    // TODO: Add ladder sound here
+                }
+                anim = TRUE;
+            } else {
+                // Reached bottom of ladder
+                player_ladder = FALSE;
+            }
+        }
+    }
+
+    // Update climbing animation
+    if anim != 0 {
+        off = 0;
+
+        // Determine climb animation frame based on distance from ladder top
+        if (test_map(x, player_y + 15) & (T_LADDER | T_LADDER_BROKEN)) == 0 {
+            off = 6;
+        } else if (test_map(x, player_y + 12) & (T_LADDER | T_LADDER_BROKEN)) == 0 {
+            off = 0;
+        } else if (test_map(x, player_y + 8) & (T_LADDER | T_LADDER_BROKEN)) == 0 {
+            off = 4;
+        } else if (test_map(x, player_y + 4) & (T_LADDER | T_LADDER_BROKEN)) == 0 {
+            off = 2;
+        }
+
+        let frame: u8 = ((player_step >> 2) & 1) + off;
+        player_anim = player_climb_anim[frame];
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Check for Floor Under Player
+// Returns collision flags (T_SOLID bits)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_check_floor() -> u8 {
+    let left: u8 = test_map(player_x + 8 - PLR_BBOX_HWDT, player_y + 16);
+    let right: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16);
+    return left | right;
+}
+
+
+// ============================================================================
+// FUNCTION: Process Falling
+// Returns LEVEL_LOSE if fell too far, 0 otherwise
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_process_fall() -> u8 {
+    let floor1: u8 = player_check_floor();
+
+    if (floor1 & T_SOLID) == 0 {
+        // No floor - continue falling
+        if player_rivet_delay == 0 {
+            player_y++;
+
+            if player_fall == FALSE {
+                player_fall = TRUE;
+                player_dir = DIR_NONE;
+                player_jump_y = player_y;
+                player_fall_sound = 0;
+            }
+        }
+    } else {
+        // Hit the floor
+        if player_fall != FALSE {
+            player_fall = FALSE;
+            player_fall_sound = 255;
+            player_step = 0;
+            player_dir = player_dir_prev;
+
+            // Check if fell too far
+            let max_y: u8 = player_jump_y + MAX_FALL_HEIGHT;
+
+            if player_y >= max_y {
+                // TODO: Play landing sound
+                return LEVEL_LOSE;
+            }
+        }
+    }
+
+    return 0;
+}
+
+
+// ============================================================================
+// FUNCTION: Push Player Out of Solid Floor (for slopes/elevators)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_push_out_of_floor() {
+    let y: u8 = player_y + 15;
+    let left: u8;
+    let right: u8;
+
+    loop {
+        left = test_map(player_x + 8 - PLR_BBOX_HWDT, y);
+        right = test_map(player_x + 8 + PLR_BBOX_HWDT, y);
+
+        if ((left | right) & T_SOLID) == 0 {
+            break;
+        }
+
+        player_y--;
+        y--;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Process Jump
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_process_jump(pad @ A: u16) {
+    let dy: i8;
+    let floor1: u8;
+
+    if player_jump == JUMP_NONE {
+        // Check for jump button press
+        if (pad & (PAD_A | PAD_B)) != 0 {
+            if player_ladder == FALSE {
+                if player_fall == FALSE {
+                    if player_hammer_time == 0 {
+                        // Start jump
+                        player_jump = JUMP_AIR;
+                        player_jump_cnt = 0;
+                        player_jump_y = player_y;
+                        // TODO: Play jump sound
+                    } else {
+                        player_jump = JUMP_DUMMY;
+                    }
+                } else {
+                    player_jump = JUMP_DUMMY;
+                }
+            } else {
+                player_jump = JUMP_DUMMY;
+            }
+        }
+    } else if player_jump == JUMP_LAND || player_jump == JUMP_DUMMY {
+        // Wait for button release
+        if (pad & PAD_A) == 0 {
+            if (pad & PAD_B) == 0 {
+                player_jump = JUMP_NONE;
+            }
+        }
+    } else if player_jump == JUMP_AIR {
+        // Apply jump table velocity
+        dy = player_jump_table[player_jump_cnt];
+        player_jump_cnt++;
+
+        // Move player vertically
+        if dy < 0 {
+            player_y = player_y - ((-dy) as u8);
+        } else if dy > 0 {
+            player_y = player_y + (dy as u8);
+        }
+
+        // Check if jump is complete
+        if player_jump_cnt >= JUMP_TABLE_SIZE {
+            player_jump = JUMP_LAND;
+            player_fall = TRUE;
+            // TODO: Play fall sound
+        }
+
+        // Check for floor collision during jump
+        if player_jump_cnt > 2 {
+            let i: u8 = 0;
+            loop {
+                floor1 = test_map(player_x + 8 - PLR_BBOX_HWDT, player_y + 16 - i);
+                let floor2: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16 - i);
+
+                if ((floor1 | floor2) & T_SOLID) != 0 {
+                    player_jump = JUMP_LAND;
+                    player_fall = TRUE;
+                    player_y = player_y - i;
+                    // TODO: Play landing sound
+                    break;
+                }
+
+                i++;
+                if i >= 2 {
+                    break;
+                }
+            }
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Process Airborne Movement (while jumping or falling)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_process_airborne() {
+    // Play fall sound after a few frames
+    if player_jump != JUMP_AIR {
+        if player_fall_sound < 2 {
+            player_fall_sound++;
+            if player_fall_sound == 2 {
+                // TODO: Play fall sound
+            }
+        }
+    }
+
+    // Horizontal movement while airborne
+    if player_dir == DIR_LEFT {
+        player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR;
+
+        if player_horz_div(2) != 0 {
+            player_x--;
+            if player_x <= player_clip_left() {
+                player_dir = DIR_RIGHT;
+            }
+        }
+    } else if player_dir == DIR_RIGHT {
+        player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR | SPR_HFLIP;
+
+        if player_horz_div(2) != 0 {
+            player_x++;
+            if player_x >= player_clip_right() {
+                player_dir = DIR_LEFT;
+            }
+        }
+    } else {
+        // Neutral jump animation
+        if player_dir_prev == DIR_LEFT {
+            player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR;
+        } else {
+            player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR | SPR_HFLIP;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Process Hammer
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_process_hammer() {
+    if player_hammer_time == 0 {
+        // Hide hammer sprites
+        oam_spr1(0, 240, 0, OAM_HAMMER);
+        oam_spr1(0, 240, 0, OAM_HAMMER + 4);
+        return;
+    }
+
+    // Decrease hammer timer
+    player_hammer_time--;
+
+    if player_hammer_time == 0 {
+        // Hammer expired - play normal music
+        // TODO: music_play(MUS_LEVEL1);
+    }
+
+    // Animate hammer
+    player_hammer_cnt++;
+    if player_hammer_cnt >= 6 {
+        player_hammer_cnt = 0;
+        player_hammer_phase++;
+        if player_hammer_phase >= 4 {
+            player_hammer_phase = 0;
+        }
+    }
+
+    // Display hammer sprites
+    let phase_off: u8 = player_hammer_phase * 2;
+
+    let hx: i16 = (player_x as i16) + (hammer_offsets[phase_off] as i16);
+    let hy: i16 = (player_y as i16) + (hammer_offsets[phase_off + 1] as i16);
+
+    // Clamp positions
+    if hx < 0 { hx = 0; }
+    if hx > 255 { hx = 255; }
+    if hy < 0 { hy = 0; }
+    if hy > 239 { hy = 240; }
+
+    oam_spr1(hx as u8, hy as u8, hammer_sprites[phase_off], OAM_HAMMER);
+    oam_spr1(player_x, player_y, hammer_sprites[phase_off + 1], OAM_HAMMER + 4);
+}
+
+
+// ============================================================================
+// FUNCTION: Update Player Sprite in OAM
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_update_oam() {
+    oam_spr1(player_x, player_y - 1, player_anim, OAM_PLAYER);
+}
+
+
+// ============================================================================
+// FUNCTION: Main Player Update (called every frame)
+// Returns: 0 = OK, LEVEL_LOSE = player died
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_update(pad @ A: u16) -> u8 {
+    let result: u8 = 0;
+
+    // Handle rivet delay countdown
+    if player_rivet_delay != 0 {
+        player_rivet_delay--;
+    }
+
+    // Process based on state
+    if player_jump != JUMP_AIR {
+        if player_fall == FALSE && player_ladder == FALSE {
+            // On ground - process walking
+            player_process_ground(pad);
+            player_push_out_of_floor();
+        }
+
+        if player_ladder == FALSE {
+            // Check for falling
+            result = player_process_fall();
+            if result != 0 {
+                return result;
+            }
+
+            // Check for ladder entry
+            if player_fall == FALSE && player_hammer_time == 0 {
+                player_check_ladder(pad);
+            }
+        }
+
+        if player_ladder != FALSE {
+            // Process ladder climbing
+            player_process_ladder(pad);
+        }
+    }
+
+    // Process jump (can be triggered in any state)
+    player_process_jump(pad);
+
+    // Process airborne movement
+    if player_fall != FALSE || player_jump == JUMP_AIR {
+        player_process_airborne();
+    }
+
+    // Process hammer
+    player_process_hammer();
+
+    // Store previous direction
+    if player_dir != DIR_NONE {
+        player_dir_prev = player_dir;
+    }
+
+    // Update sprite
+    player_update_oam();
+
+    return 0;
+}
+
+
+// ============================================================================
+// FUNCTION: Play Player Death Animation
+// ============================================================================
+
+#[mode(m8, x8)]
+fn player_death_animation() {
+    let frame: u8 = 0;
+    let counter: u8 = 0;
+
+    loop {
+        nmi_wait();
+
+        // Update animation every 8 frames
+        counter++;
+        if counter >= 8 {
+            counter = 0;
+            frame++;
+            if frame >= 4 {
+                frame = 0;
+            }
+        }
+
+        // Display death animation sprite
+        oam_spr1(player_x, player_y - 1, player_lose_anim[frame], OAM_PLAYER);
+
+        // Run for about 2 seconds (120 frames)
+        if frame == 0 && counter == 0 {
+            // Check if we've looped a few times
+            break;
+        }
+    }
+}

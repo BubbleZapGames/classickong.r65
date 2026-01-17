@@ -1,0 +1,872 @@
+// ============================================================================
+// Classic Kong Complete - Cutscenes and Title Screen
+// ============================================================================
+// Handles title screen, intro, level start, and level clear cutscenes
+// ============================================================================
+
+// ============================================================================
+// CUTSCENE VARIABLES
+// ============================================================================
+
+#[ram]
+static mut platform_anim_cnt: [u8; 192];  // 6*32 for bending platforms
+
+// Sound mode strings
+static sound_mode_blank: [u8; 12] = "           ";
+static sound_mode_mono: [u8; 12] = " MONO MODE ";
+static sound_mode_stereo: [u8; 12] = "STEREO MODE";
+
+// Height strings for level start cutscene
+static height_str_25: [u8; 9] = " 25 M  $";
+static height_str_50: [u8; 9] = " 50 M  $";
+static height_str_75: [u8; 9] = " 75 M  $";
+static height_str_100: [u8; 9] = "100 M  $";
+
+// Cheat codes
+static test_code: [u16; 6] = [PAD_B, PAD_A, PAD_R, PAD_R, PAD_A, PAD_L];
+static hard_code: [u16; 8] = [PAD_B, PAD_A, PAD_DOWN, PAD_B, PAD_UP, PAD_DOWN, PAD_DOWN, PAD_Y];
+
+// Platform bending animation tiles
+static platform_anim: [u16; 14] = [
+    0x0140 | BG_PAL!(1),  // Frame 0 top
+    0x0140 | BG_PAL!(1),  // Frame 0 bottom
+    0x0145 | BG_PAL!(1),  // Frame 1 top
+    0x0145 | BG_PAL!(1),  // Frame 1 bottom
+    0x0145 | BG_PAL!(1),  // Frame 2 top
+    0x0145 | BG_PAL!(1),  // Frame 2 bottom
+    0x0145 | BG_PAL!(1),  // Frame 3 top
+    0x0145 | BG_PAL!(1),  // Frame 3 bottom
+    0x0145 | BG_PAL!(1),  // Frame 4 top
+    0x0145 | BG_PAL!(1),  // Frame 4 bottom
+    0x0145 | BG_PAL!(1),  // Frame 5 top
+    0x0145 | BG_PAL!(1),  // Frame 5 bottom
+    0x0145 | BG_PAL!(1),  // Frame 6 top
+    0x0145 | BG_PAL!(1)   // Frame 6 bottom
+];
+
+
+// ============================================================================
+// FUNCTION: Display Press Start Message
+// ============================================================================
+
+#[mode(m8, x8)]
+fn title_screen_press_start_str(show @ A: u8) {
+    if show != 0 {
+        put_str(&nametable1[POS!(10, 22)] as *u16, "PRESS START" as far *u8);
+    } else {
+        put_str(&nametable1[POS!(10, 22)] as *u16, "           " as far *u8);
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Fill Rectangle in Nametable with Tiles
+// ============================================================================
+
+#[mode(m8, x16)]
+fn title_set_rect(off @ X: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
+    let row: u8 = 0;
+    let current_tile: u16 = tile;
+    let pos: u16 = off;
+
+    loop {
+        let col: u8 = 0;
+        loop {
+            nametable1[pos + (col as u16)] = current_tile + (col as u16);
+            col++;
+            if col >= wdt {
+                break;
+            }
+        }
+
+        pos = pos + 32;
+        current_tile = current_tile + (swdt as u16);
+        row++;
+        if row >= hgt {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Put Number (decimal)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn put_num(dest @ X: *u16, value: u32, digits: u8) {
+    let d: u8 = digits;
+    let v: u32 = value;
+
+    // Write digits right-to-left
+    loop {
+        if d == 0 {
+            break;
+        }
+        d--;
+
+        let digit: u8 = (v % 10) as u8;
+        v = v / 10;
+
+        dest[d] = (0x30 + digit) as u16;  // ASCII '0' + digit
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Title Screen
+// Returns 1 if A+B held (skip intro)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn full_title_screen() -> u8 {
+    set_bright(0);
+    oam_clear();
+
+    // Copy title graphics to VRAM
+    copy_to_vram(0x1800, &title_top_gfx as far *u8, 2400, 0);
+    copy_to_vram(0x1CB0, &title_bottom_gfx as far *u8, 6912, 0);
+
+    clear_nametables();
+
+    // Set up title graphics using tiles
+    title_set_rect(POS!(4, 5), 13, 3, 0x180 | BG_PAL!(5), 25);
+    title_set_rect(POS!(4, 8), 24, 9, 0x1CB | BG_PAL!(6), 24);
+    title_set_rect(POS!(16, 17), 12, 3, 0x18D | BG_PAL!(5), 25);
+
+    // Display text
+    put_str(&nametable1[POS!(4, 2)] as *u16, "SCORE:000000" as far *u8);
+    put_str(&nametable1[POS!(17, 2)] as *u16, "BEST:000000" as far *u8);
+    put_str(&nametable1[POS!(8, 26)] as *u16, "@2012 BUBBLEZAP" as far *u8);
+
+    // Show scores
+    put_num(&nametable1[POS!(10, 2)] as *u16, game_score, 6);
+    put_num(&nametable1[POS!(22, 2)] as *u16, game_best_score, 6);
+
+    update_nametables();
+    setup_palettes();
+    update_palette();
+
+    let bright: u8 = 0;
+    game_frame_cnt = 0;
+    let cnt: u8 = 0;
+    let codet: u8 = 0;
+    let codeh: u8 = 0;
+
+    // TODO: music_play(MUS_TITLE);
+
+    loop {
+        // Blink press start message
+        if (game_frame_cnt & 32) != 0 {
+            title_screen_press_start_str(TRUE);
+        } else {
+            title_screen_press_start_str(FALSE);
+        }
+
+        // Show sound mode indicator
+        if cnt != 0 {
+            if global_stereo != 0 {
+                put_str(&nametable1[POS!(10, 24)] as *u16, &sound_mode_stereo as far *u8);
+            } else {
+                put_str(&nametable1[POS!(10, 24)] as *u16, &sound_mode_mono as far *u8);
+            }
+        } else {
+            put_str(&nametable1[POS!(10, 24)] as *u16, &sound_mode_blank as far *u8);
+        }
+
+        nmi_wait();
+        update_nametables();
+
+        game_frame_cnt++;
+
+        // Fade in
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        pad_read_ports();
+        let trig: u16 = pad_poll_trigger(0);
+
+        // Start button pressed
+        if bright == 15 && (trig & PAD_START) != 0 {
+            break;
+        }
+
+        // Select changes stereo mode
+        if (trig & PAD_SELECT) != 0 {
+            global_stereo = global_stereo ^ 1;
+            // TODO: spc_stereo(global_stereo);
+            // TODO: sfx_play(SFX_CHN+2, SFX_ITEM, 128);
+            cnt = 60;
+        }
+
+        // Check test code
+        if trig != 0 {
+            if test_code[codet] == trig {
+                codet++;
+                if codet == 6 {
+                    // TODO: sfx_play(SFX_CHN+2, SFX_LOVE, 128);
+                    game_test_mode = game_test_mode ^ TRUE;
+                    codet = 0;
+                }
+            } else {
+                codet = 0;
+            }
+
+            // Check hard code
+            if hard_code[codeh] == trig {
+                codeh++;
+                if codeh == 8 {
+                    // TODO: sfx_play(SFX_CHN+2, SFX_KONG_LAUGH, 128);
+                    game_hard_mode = game_hard_mode ^ TRUE;
+                    codeh = 0;
+                }
+            } else {
+                codeh = 0;
+            }
+        }
+
+        if cnt != 0 {
+            cnt--;
+        }
+    }
+
+    // TODO: music_stop();
+    // TODO: sfx_play(SFX_CHN+3, SFX_START, 128);
+
+    // Blink press start text
+    let i: u8 = 0;
+    loop {
+        title_screen_press_start_str((i & 1) as u8);
+        delay(4);
+        update_nametables();
+        i++;
+        if i >= 15 {
+            break;
+        }
+    }
+
+    // Check if A+B held for skip intro
+    let pad: u16 = pad_poll(0);
+    let skip: u8 = FALSE;
+    if (pad & PAD_A) != 0 && (pad & PAD_B) != 0 {
+        skip = TRUE;
+    }
+
+    fade_screen(0, 1);
+
+    return skip;
+}
+
+
+// ============================================================================
+// FUNCTION: Delay for N frames
+// ============================================================================
+
+#[mode(m8, x8)]
+fn delay(frames @ A: u8) {
+    let n: u8 = frames;
+    loop {
+        if n == 0 {
+            break;
+        }
+        nmi_wait();
+        n--;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Level Start Cutscene (How High Can You Get)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn cutscene_level() {
+    set_bright(0);
+    oam_clear();
+
+    setup_ingame_graphics();
+    clear_nametables();
+
+    // Fill background with pattern
+    let ptr: u16 = 0;
+    loop {
+        nametable2[ptr] = 0x158 | BG_PAL!(1);
+        ptr++;
+        if ptr >= 1024 {
+            break;
+        }
+    }
+
+    // Show height markers based on level
+    if game_level >= 0 {
+        put_str(&nametable1[POS!(5, 20)] as *u16, &height_str_25 as far *u8);
+    }
+    if game_level >= 1 {
+        put_str(&nametable1[POS!(5, 15)] as *u16, &height_str_50 as far *u8);
+    }
+    if game_level >= 2 {
+        put_str(&nametable1[POS!(5, 10)] as *u16, &height_str_75 as far *u8);
+    }
+    if game_level >= 3 {
+        put_str(&nametable1[POS!(5, 5)] as *u16, &height_str_100 as far *u8);
+    }
+
+    put_str(&nametable1[POS!(5, 25)] as *u16, "HOW HIGH CAN YOU GET ?" as far *u8);
+
+    update_nametables();
+    setup_palettes();
+    update_palette();
+
+    // Set all sprites to 16x16
+    let i: u16 = 0;
+    loop {
+        oam_size(i << 2, 1);
+        i++;
+        if i >= 128 {
+            break;
+        }
+    }
+
+    let bright: u8 = 0;
+    let delay_cnt: u8 = 25;
+
+    // TODO: setup_hdma_gradient(7);
+    // TODO: spc_volume(global_volume);
+
+    // Simple animation: Kong drops in from above
+    let stack_y: [i16; 4] = [-512, -512, -512, -512];
+    let stack_ty: [i16; 4] = [160, 120, 80, 40];
+    let stack_dy: [i16; 4] = [0, 0, 0, 0];
+    let stack_frame: [u8; 4] = [0, 0, 0, 0];
+    let stack_jump: [u8; 4] = [0, 0, 0, 0];
+    let stack_delay: [u8; 4] = [0, 25, 50, 75];
+
+    let frame: u16 = 0;
+    loop {
+        nmi_wait();
+
+        // Fade in
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        // Animate Kong stacks
+        let j: u8 = 0;
+        loop {
+            if j > game_level {
+                break;
+            }
+
+            if stack_delay[j] != 0 {
+                stack_delay[j]--;
+                j++;
+                continue;
+            }
+
+            if stack_jump[j] < 4 {
+                stack_y[j] = stack_y[j] + stack_dy[j];
+
+                if stack_dy[j] < 64 {
+                    stack_dy[j] = stack_dy[j] + 6;
+                }
+
+                if stack_y[j] >= stack_ty[j] {
+                    stack_y[j] = stack_ty[j];
+                    stack_dy[j] = 0 - (stack_dy[j] / 3);
+                    stack_jump[j]++;
+                }
+            }
+
+            if stack_jump[j] != 0 {
+                if (game_frame_cnt & 1) != 0 {
+                    if stack_frame[j] < 3 {
+                        stack_frame[j]++;
+                    }
+                }
+            }
+
+            // Use simple frame for Kong
+            kong_frame_idx = kong_anim_both[3 - stack_frame[j]];
+            game_show_kong((j as u16) << 4, 112, stack_y[j] >> 6);
+
+            j++;
+        }
+
+        if delay_cnt != 0 {
+            delay_cnt--;
+            if delay_cnt == 0 {
+                // TODO: music_play(MUS_STAGE_START);
+            }
+        }
+
+        game_frame_cnt++;
+        frame++;
+        if frame >= 250 {
+            break;
+        }
+    }
+
+    fade_screen(0, 1);
+}
+
+
+// ============================================================================
+// FUNCTION: Intro Cutscene (Kong climbs with princess)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn cutscene_intro() {
+    game_flip = 0;
+
+    set_bright(0);
+    oam_clear();
+
+    setup_ingame_graphics();
+    clear_nametables();
+
+    // Load intro map
+    unrle(&map as *u8, &mapi_data as far *u8);
+
+    // Copy map to nametable
+    let ptr: u16 = 0;
+    loop {
+        nametable1[ptr] = (map[ptr] as u16) + 0x0140 | BG_PAL!(1);
+        ptr++;
+        if ptr >= 1024 {
+            break;
+        }
+    }
+
+    update_nametables();
+    setup_palettes();
+    update_palette();
+
+    // Set all sprites to 16x16
+    let i: u16 = 0;
+    loop {
+        oam_size(i << 2, 1);
+        i++;
+        if i >= 128 {
+            break;
+        }
+    }
+
+    // TODO: music_play(MUS_GAME_START);
+
+    kong_x = 115;
+    kong_y = 240;
+    princess_x = kong_x + 20;
+    princess_y = (kong_y - 8) as u8;
+
+    let bright: u8 = 0;
+
+    // Kong climbs up
+    loop {
+        if kong_y <= 40 {
+            break;
+        }
+
+        nmi_wait();
+
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        // Climbing animation
+        if (game_frame_cnt & 8) != 0 {
+            kong_frame_idx = KONG_ANIM_FACE2_RIGHT;
+        } else {
+            kong_frame_idx = KONG_ANIM_FACE3_RIGHT;
+        }
+
+        kong_y--;
+        princess_x = kong_x + 20;
+        princess_y = (kong_y as i16 - 8) as u8;
+
+        game_show_kong(OAM_KONG, kong_x, kong_y);
+        game_show_princess(0);
+
+        game_frame_cnt++;
+    }
+
+    // Kong jumps and releases princess
+    let ky: i16 = kong_y << 6;
+    let kdy: i16 = -64;
+    let hold: u8 = TRUE;
+
+    loop {
+        nmi_wait();
+
+        ky = ky + kdy;
+        kdy++;
+        if kdy > 0 {
+            kdy++;
+        }
+
+        kong_y = ky >> 6;
+
+        if kong_y < 10 {
+            hold = FALSE;
+        }
+
+        if hold != 0 {
+            princess_x = kong_x + 20;
+            princess_y = (kong_y as i16 - 8) as u8;
+        } else {
+            // Princess stays at top
+            if princess_y > 3 && (game_frame_cnt & 3) == 0 {
+                princess_y--;
+            }
+        }
+
+        kong_frame_idx = KONG_ANIM_FACE1;
+        game_show_kong(OAM_KONG, kong_x, kong_y);
+        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+
+        game_frame_cnt++;
+
+        if kdy > 0 && kong_y >= 25 {
+            kong_y = 25;
+            break;
+        }
+    }
+
+    // Kong jumps to position (simplified)
+    kong_frame_idx = KONG_ANIM_FACE4_BOTH;
+    let jump_cnt: u8 = 0;
+
+    loop {
+        nmi_wait();
+        update_nametables();
+
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        if jump_cnt < 6 {
+            let target_x: u8 = 36;
+            if kong_x > target_x {
+                kong_x--;
+            }
+
+            // Simple jump physics
+            ky = ky + kdy;
+            kdy = kdy + 4;
+
+            kong_y = ky >> 6;
+            if kong_y >= 24 {
+                kong_y = 24;
+            }
+
+            if ky >= (24 << 6) {
+                ky = 24 << 6;
+                kdy = -64;
+                jump_cnt++;
+                // TODO: sfx_play(SFX_CHN+1, SFX_KONG_RIGHT, kong_x+16);
+            }
+        }
+
+        game_show_kong(OAM_KONG, kong_x, kong_y);
+        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+
+        game_frame_cnt++;
+
+        if jump_cnt >= 6 {
+            break;
+        }
+    }
+
+    // Kong laugh
+    let laugh_cnt: u8 = 0;
+    loop {
+        nmi_wait();
+
+        if (laugh_cnt & 15) == 0 {
+            // TODO: sfx_play(SFX_CHN+1, SFX_KONG_LAUGH, kong_x+16);
+            kong_frame_idx = KONG_ANIM_LAUGH;
+        }
+
+        if (laugh_cnt & 15) == 8 {
+            kong_frame_idx = KONG_ANIM_FACE1;
+        }
+
+        game_show_kong(OAM_KONG, kong_x, kong_y);
+        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+
+        game_frame_cnt++;
+        laugh_cnt++;
+        if laugh_cnt >= 80 {
+            break;
+        }
+    }
+
+    delay(25);
+    fade_screen(0, 1);
+}
+
+
+// ============================================================================
+// FUNCTION: Level Clear Cutscene (Simplified)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn cutscene_levels_clear() {
+    game_flip = 0;
+
+    set_bright(0);
+    oam_clear();
+
+    setup_ingame_graphics();
+    clear_nametables();
+
+    // Load ending map
+    unrle(&map as *u8, &mape_data as far *u8);
+
+    // Copy map to nametable
+    let ptr: u16 = 0;
+    loop {
+        nametable1[ptr] = (map[ptr] as u16) + 0x0140 | BG_PAL!(1) | BG_PRI;
+        ptr++;
+        if ptr >= 1024 {
+            break;
+        }
+    }
+
+    update_nametables();
+    setup_palettes();
+    update_palette();
+
+    let bright: u8 = 0;
+
+    kong_x = 112;
+    kong_y = 23;
+
+    princess_x = 48;
+    princess_y = 27;
+
+    player_x = 192;
+    player_y = 39;
+
+    particles_clear();
+    kong_frame_idx = KONG_ANIM_FACE1;
+
+    // Set all sprites to 16x16
+    let i: u16 = 0;
+    loop {
+        oam_size(i << 2, 1);
+        i++;
+        if i >= 128 {
+            break;
+        }
+    }
+
+    // TODO: spc_volume(global_volume);
+
+    let frame: u16 = 0;
+    let fall_start: u8 = FALSE;
+    let fall_ground: u8 = FALSE;
+    let ky: i16 = 23 << 6;
+    let kdy: i16 = 0;
+
+    loop {
+        nmi_wait();
+
+        // Fade in
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        if frame < 144 {
+            // Kong pumping animation
+            kong_stand_animation_level2();
+        } else {
+            // Kong falling sequence (simplified)
+            if fall_start == FALSE {
+                fall_start = TRUE;
+                // TODO: sfx_play(SFX_CHN+2, SFX_KONG_FALLS, 128);
+            }
+
+            ky = ky + kdy;
+            if kdy < 128 {
+                kdy = kdy + 6;
+            }
+
+            if ky >= (182 << 6) {
+                ky = 182 << 6;
+                kdy = 0;
+
+                if fall_ground == FALSE {
+                    fall_ground = TRUE;
+                    // TODO: sfx_play(SFX_CHN+2, SFX_KONG_LANDS, 128);
+                }
+            }
+
+            kong_y = ky >> 6;
+        }
+
+        game_show_kong(OAM_KONG, kong_x, kong_y);
+        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+
+        // Draw player
+        let player_tile: u16 = PLAYER_TILE + ((player_x >> 1) & 3) as u16 * 2;
+        oam_spr1(player_x, player_y, player_tile | PLAYER_ATR, OAM_PLAYER);
+
+        particle_process();
+
+        // Start victory music
+        if frame == 350 {
+            // TODO: music_play(MUS_VICTORY);
+        }
+
+        // Mario and princess walk toward each other
+        if frame > 480 {
+            if frame % 3 == 0 {
+                if princess_x < 96 {
+                    princess_x++;
+                }
+                if player_x > 144 {
+                    player_x--;
+                }
+            }
+        }
+
+        // Heart appears
+        if frame == 670 {
+            particle_add(PART_TYPE_HEART, 120, 32);
+            // TODO: sfx_play(SFX_CHN+3, SFX_LOVE, 128);
+        }
+
+        // Final walk together
+        if frame > 810 {
+            if (frame & 1) != 0 {
+                princess_x++;
+                player_x--;
+            }
+        }
+
+        game_frame_cnt++;
+        frame++;
+        if frame >= 840 {
+            break;
+        }
+    }
+
+    fade_screen(0, 1);
+}
+
+
+// ============================================================================
+// FUNCTION: Next Level Cutscene (Kong grabs princess)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn cutscene_next_level() {
+    // Show heart
+    // TODO: sfx_play(SFX_CHN, SFX_HEART, player_x);
+
+    let heart_x: u8;
+    if princess_x < player_x {
+        heart_x = player_x - 20;
+    } else {
+        heart_x = player_x + 20;
+    }
+    let heart_y: u8 = player_y;
+
+    kong_frame_idx = KONG_ANIM_FACE1;
+    game_show_kong(OAM_KONG, kong_x, kong_y);
+
+    // Heart rises
+    let i: u8 = 0;
+    loop {
+        nmi_wait();
+        oam_spr(heart_x as u16, (heart_y as i16) + ((15 - i) >> 1) as i16,
+                PRINCESS_TILE + (((i & 2) ^ 2) as u16) + 0x0C | PRINCESS_ATR, OAM_PARTICLES);
+        i++;
+        if i >= 16 {
+            break;
+        }
+    }
+
+    delay(25);
+
+    // Kong jumps to ladder and grabs princess (simplified)
+    let target_x: u8;
+    if game_flip == 0 {
+        target_x = 76;
+    } else {
+        target_x = 192;
+    }
+
+    let hold: u8 = FALSE;
+
+    loop {
+        nmi_wait();
+
+        if kong_x < target_x {
+            kong_x++;
+        } else if kong_x > target_x {
+            kong_x--;
+        }
+
+        // Grab princess when close
+        if kong_x > 56 && kong_x < 200 {
+            hold = TRUE;
+        }
+
+        if hold != 0 {
+            princess_x = kong_x + 24;
+            princess_y = (kong_y as i16 - 8) as u8;
+        }
+
+        kong_frame_idx = KONG_ANIM_SIDE_RIGHT;
+        game_show_kong(OAM_KONG, kong_x + 4, kong_y);
+        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+
+        game_frame_cnt++;
+
+        if kong_x == target_x {
+            break;
+        }
+    }
+
+    // Kong climbs away
+    loop {
+        nmi_wait();
+
+        if (game_frame_cnt & 1) != 0 {
+            kong_y--;
+        }
+
+        if (game_frame_cnt & 8) != 0 {
+            kong_frame_idx = KONG_ANIM_FACE2_RIGHT;
+        } else {
+            kong_frame_idx = KONG_ANIM_FACE3_RIGHT;
+        }
+
+        princess_x = kong_x + 24;
+        princess_y = (kong_y as i16 - 8) as u8;
+
+        game_show_kong(OAM_KONG, kong_x + 4, kong_y);
+        game_show_princess(0);
+
+        game_frame_cnt++;
+
+        if kong_y < -32 {
+            break;
+        }
+    }
+
+    // Broken heart
+    delay(16);
+
+    oam_spr(heart_x as u16, heart_y as i16, PLAYER_TILE + 0x4C | PLAYER_ATR, OAM_PARTICLES);
+    // TODO: sfx_play(SFX_CHN, SFX_CRACK, heart_x);
+
+    delay(80);
+}

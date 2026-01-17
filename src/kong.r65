@@ -1,0 +1,812 @@
+// ============================================================================
+// Classic Kong Complete - Kong AI and Animation
+// ============================================================================
+// Handles Kong's behavior, barrel throwing, and princess display
+// ============================================================================
+
+// ============================================================================
+// CONSTANTS - Kong States
+// ============================================================================
+
+const KONG_STATE_STAND: u8 = 0;
+const KONG_STATE_TAKE: u8 = 1;
+const KONG_STATE_MIDDLE: u8 = 2;
+const KONG_STATE_DROP: u8 = 3;
+const KONG_STATE_WAIT: u8 = 4;
+
+
+// ============================================================================
+// KONG STATE VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut kong_x: u8;
+
+#[lowram]
+static mut kong_y: i16;
+
+#[lowram]
+static mut kong_frame_cnt: u8;
+
+#[lowram]
+static mut kong_state: u8;
+
+#[lowram]
+static mut kong_delay: u8;
+
+#[lowram]
+static mut kong_throw_wild_barrel: u8;
+
+#[lowram]
+static mut kong_wild_barrel_type: u8;
+
+#[lowram]
+static mut kong_start: u8;
+
+// Pointer to current animation frame data
+#[lowram]
+static mut kong_frame_idx: u8;
+
+#[lowram]
+static mut kong_frame_bank: u8;
+
+
+// ============================================================================
+// PRINCESS STATE VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut princess_x: u8;
+
+#[lowram]
+static mut princess_y: u8;
+
+
+// ============================================================================
+// LADDER VARIABLES (Level 2 retractable ladders)
+// ============================================================================
+
+#[ram]
+static mut ladders_x: [u8; 2];
+
+#[ram]
+static mut ladders_y: [u8; 2];
+
+#[ram]
+static mut ladders_dir: [u8; 2];
+
+#[ram]
+static mut ladders_cnt: [u8; 2];
+
+
+// ============================================================================
+// DIFFICULTY VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut game_level_difficulty_count: u16;
+
+#[lowram]
+static mut game_bounce_delay: u16;
+
+#[lowram]
+static mut conveyor_cnt_middle: u8;
+
+#[lowram]
+static mut game_belts_update: u8;
+
+#[ram]
+static mut conveyor_cnt: [u16; 3];
+
+
+// ============================================================================
+// FIREBALL SPAWN POINTS (Level 4)
+// ============================================================================
+
+#[lowram]
+static mut fireball_spawn_all: u8;
+
+#[ram]
+static mut fireball_spawn_x: [u8; 8];
+
+#[ram]
+static mut fireball_spawn_y: [u8; 8];
+
+
+// ============================================================================
+// KONG ANIMATION FRAMES - 4 sprites per frame (x, y, tile)
+// Each entry is: x_offset, y_offset, tile | attributes
+// Using u16 for tile+attr combined
+// ============================================================================
+
+// Face forward, arms down
+static kong_face1: [u16; 12] = [
+    0,  0, KONG_TILE + 0x00 | KONG_ATR,
+    0, 16, KONG_TILE + 0x20 | KONG_ATR,
+   16,  0, KONG_TILE + 0x00 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x20 | KONG_ATR | SPR_HFLIP
+];
+
+// Face forward, arms up (both sides)
+static kong_face2_both: [u16; 12] = [
+    0,  0, KONG_TILE + 0x02 | KONG_ATR,
+    0, 16, KONG_TILE + 0x22 | KONG_ATR,
+   16,  0, KONG_TILE + 0x02 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x22 | KONG_ATR | SPR_HFLIP
+];
+
+static kong_face3_both: [u16; 12] = [
+    0,  0, KONG_TILE + 0x04 | KONG_ATR,
+    0, 16, KONG_TILE + 0x24 | KONG_ATR,
+   16,  0, KONG_TILE + 0x04 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x24 | KONG_ATR | SPR_HFLIP
+];
+
+static kong_face4_both: [u16; 12] = [
+    0,  0, KONG_TILE + 0x06 | KONG_ATR,
+    0, 16, KONG_TILE + 0x26 | KONG_ATR,
+   16,  0, KONG_TILE + 0x06 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x26 | KONG_ATR | SPR_HFLIP
+];
+
+// Face forward, left arm up (right down)
+static kong_face2_left: [u16; 12] = [
+    0,  0, KONG_TILE + 0x02 | KONG_ATR,
+    0, 16, KONG_TILE + 0x22 | KONG_ATR,
+   16,  0, KONG_TILE + 0x42 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x62 | KONG_ATR | SPR_HFLIP
+];
+
+static kong_face3_left: [u16; 12] = [
+    0,  0, KONG_TILE + 0x04 | KONG_ATR,
+    0, 16, KONG_TILE + 0x24 | KONG_ATR,
+   16,  0, KONG_TILE + 0x44 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x64 | KONG_ATR | SPR_HFLIP
+];
+
+static kong_face4_left: [u16; 12] = [
+    0,  0, KONG_TILE + 0x06 | KONG_ATR,
+    0, 16, KONG_TILE + 0x26 | KONG_ATR,
+   16,  0, KONG_TILE + 0x46 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x66 | KONG_ATR | SPR_HFLIP
+];
+
+// Face forward, right arm up (left down)
+static kong_face2_right: [u16; 12] = [
+    0,  0, KONG_TILE + 0x42 | KONG_ATR,
+    0, 16, KONG_TILE + 0x62 | KONG_ATR,
+   16,  0, KONG_TILE + 0x02 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x22 | KONG_ATR | SPR_HFLIP
+];
+
+static kong_face3_right: [u16; 12] = [
+    0,  0, KONG_TILE + 0x44 | KONG_ATR,
+    0, 16, KONG_TILE + 0x64 | KONG_ATR,
+   16,  0, KONG_TILE + 0x04 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x24 | KONG_ATR | SPR_HFLIP
+];
+
+static kong_face4_right: [u16; 12] = [
+    0,  0, KONG_TILE + 0x46 | KONG_ATR,
+    0, 16, KONG_TILE + 0x66 | KONG_ATR,
+   16,  0, KONG_TILE + 0x06 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x26 | KONG_ATR | SPR_HFLIP
+];
+
+// Side view left
+static kong_side_left: [u16; 12] = [
+    0,  0, KONG_TILE + 0x08 | KONG_ATR,
+    0, 16, KONG_TILE + 0x28 | KONG_ATR,
+   16,  0, KONG_TILE + 0x0A | KONG_ATR,
+   16, 16, KONG_TILE + 0x2A | KONG_ATR
+];
+
+// Side view right
+static kong_side_right: [u16; 12] = [
+    0,  0, KONG_TILE + 0x0A | KONG_ATR | SPR_HFLIP,
+    0, 16, KONG_TILE + 0x2A | KONG_ATR | SPR_HFLIP,
+   16,  0, KONG_TILE + 0x08 | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x28 | KONG_ATR | SPR_HFLIP
+];
+
+// Throw pose
+static kong_throw: [u16; 12] = [
+    0,  0, KONG_TILE + 0x0C | KONG_ATR,
+    0, 16, KONG_TILE + 0x2C | KONG_ATR,
+   16,  0, KONG_TILE + 0x0C | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x2C | KONG_ATR | SPR_HFLIP
+];
+
+// Laugh pose
+static kong_laugh: [u16; 12] = [
+    0,  0, KONG_TILE + 0x0E | KONG_ATR,
+    0, 16, KONG_TILE + 0x2E | KONG_ATR,
+   16,  0, KONG_TILE + 0x0E | KONG_ATR | SPR_HFLIP,
+   16, 16, KONG_TILE + 0x2E | KONG_ATR | SPR_HFLIP
+];
+
+
+// ============================================================================
+// ANIMATION SEQUENCE INDICES
+// For left-right animation: face1, face2L, face3L, face4L, face3L, face2L,
+//                          face1, face2R, face3R, face4R, face3R, face2R, face1
+// ============================================================================
+
+const KONG_ANIM_FACE1: u8 = 0;
+const KONG_ANIM_FACE2_BOTH: u8 = 1;
+const KONG_ANIM_FACE3_BOTH: u8 = 2;
+const KONG_ANIM_FACE4_BOTH: u8 = 3;
+const KONG_ANIM_FACE2_LEFT: u8 = 4;
+const KONG_ANIM_FACE3_LEFT: u8 = 5;
+const KONG_ANIM_FACE4_LEFT: u8 = 6;
+const KONG_ANIM_FACE2_RIGHT: u8 = 7;
+const KONG_ANIM_FACE3_RIGHT: u8 = 8;
+const KONG_ANIM_FACE4_RIGHT: u8 = 9;
+const KONG_ANIM_SIDE_LEFT: u8 = 10;
+const KONG_ANIM_SIDE_RIGHT: u8 = 11;
+const KONG_ANIM_THROW: u8 = 12;
+const KONG_ANIM_LAUGH: u8 = 13;
+
+// Left-right animation sequence for level 1
+static kong_anim_leftright: [u8; 14] = [
+    KONG_ANIM_FACE1,
+    KONG_ANIM_FACE2_LEFT,
+    KONG_ANIM_FACE3_LEFT,
+    KONG_ANIM_FACE4_LEFT,
+    KONG_ANIM_FACE3_LEFT,
+    KONG_ANIM_FACE2_LEFT,
+    KONG_ANIM_FACE1,
+    KONG_ANIM_FACE2_RIGHT,
+    KONG_ANIM_FACE3_RIGHT,
+    KONG_ANIM_FACE4_RIGHT,
+    KONG_ANIM_FACE3_RIGHT,
+    KONG_ANIM_FACE2_RIGHT,
+    KONG_ANIM_FACE1,
+    KONG_ANIM_FACE1
+];
+
+// Both arms animation sequence for levels 2-4
+static kong_anim_both: [u8; 6] = [
+    KONG_ANIM_FACE1,
+    KONG_ANIM_FACE2_BOTH,
+    KONG_ANIM_FACE3_BOTH,
+    KONG_ANIM_FACE4_BOTH,
+    KONG_ANIM_FACE3_BOTH,
+    KONG_ANIM_FACE1
+];
+
+
+// ============================================================================
+// FUNCTION: Draw Kong at Position
+// ============================================================================
+
+#[mode(m8, x8)]
+fn game_show_kong(oam_off @ X: u16, kx: u8, ky: i16) {
+    let anim_idx: u8 = kong_frame_idx;
+    let frame: far *u16;
+
+    // Select frame data based on animation index
+    if anim_idx == KONG_ANIM_FACE1 {
+        frame = &kong_face1 as far *u16;
+    } else if anim_idx == KONG_ANIM_FACE2_BOTH {
+        frame = &kong_face2_both as far *u16;
+    } else if anim_idx == KONG_ANIM_FACE3_BOTH {
+        frame = &kong_face3_both as far *u16;
+    } else if anim_idx == KONG_ANIM_FACE4_BOTH {
+        frame = &kong_face4_both as far *u16;
+    } else if anim_idx == KONG_ANIM_FACE2_LEFT {
+        frame = &kong_face2_left as far *u16;
+    } else if anim_idx == KONG_ANIM_FACE3_LEFT {
+        frame = &kong_face3_left as far *u16;
+    } else if anim_idx == KONG_ANIM_FACE4_LEFT {
+        frame = &kong_face4_left as far *u16;
+    } else if anim_idx == KONG_ANIM_FACE2_RIGHT {
+        frame = &kong_face2_right as far *u16;
+    } else if anim_idx == KONG_ANIM_FACE3_RIGHT {
+        frame = &kong_face3_right as far *u16;
+    } else if anim_idx == KONG_ANIM_FACE4_RIGHT {
+        frame = &kong_face4_right as far *u16;
+    } else if anim_idx == KONG_ANIM_SIDE_LEFT {
+        frame = &kong_side_left as far *u16;
+    } else if anim_idx == KONG_ANIM_SIDE_RIGHT {
+        frame = &kong_side_right as far *u16;
+    } else if anim_idx == KONG_ANIM_THROW {
+        frame = &kong_throw as far *u16;
+    } else {
+        frame = &kong_laugh as far *u16;
+    }
+
+    // Draw 4 sprites for Kong
+    let i: u8 = 0;
+    let off: u16 = oam_off;
+
+    loop {
+        let idx: u16 = (i * 3) as u16;
+        let sx: i16 = (kx as i16) + (frame[idx] as i16);
+        let sy: i16 = ky + (frame[idx + 1] as i16);
+        let tile: u16 = frame[idx + 2];
+
+        if sy >= 0 && sy < 240 {
+            oam_spr(sx as u16, sy, tile, off);
+        } else {
+            oam_spr1(0, 240, 0, off);
+        }
+
+        off = off + 4;
+        i++;
+        if i >= 4 {
+            break;
+        }
+    }
+
+    // 5th sprite slot for barrel being held
+    oam_spr1(0, 240, 0, off);
+}
+
+
+// ============================================================================
+// FUNCTION: Draw Princess at Position
+// ============================================================================
+
+#[mode(m8, x8)]
+fn game_show_princess(frame @ A: u8) {
+    let tile: u16 = PRINCESS_TILE | PRINCESS_ATR;
+
+    if frame == 0 {
+        // Normal standing
+        oam_spr1(princess_x, princess_y, tile, OAM_PRINCESS);
+        oam_spr1(princess_x, princess_y + 16, tile + 0x20, OAM_PRINCESS + 4);
+    } else {
+        // Help animation
+        oam_spr1(princess_x, princess_y, tile + ((frame & 2) as u16), OAM_PRINCESS);
+        oam_spr1(princess_x, princess_y + 16, tile + 0x20 + ((frame & 2) as u16), OAM_PRINCESS + 4);
+    }
+
+    // Third sprite for extra details
+    oam_spr1(0, 240, 0, OAM_PRINCESS + 8);
+}
+
+
+// ============================================================================
+// FUNCTION: Kong Stand Animation for Level 1
+// Left-right swaying motion
+// ============================================================================
+
+#[mode(m8, x8)]
+fn kong_stand_animation_level1() {
+    kong_frame_idx = kong_anim_leftright[kong_frame_cnt];
+
+    if (game_frame_cnt & 3) == 0 {
+        kong_frame_cnt++;
+
+        if kong_frame_cnt == 6 {
+            // TODO: sfx_play(SFX_CHN+1, SFX_KONG_LEFT, kong_x+16);
+        }
+
+        if kong_frame_cnt == 12 {
+            // TODO: sfx_play(SFX_CHN+1, SFX_KONG_RIGHT, kong_x+16);
+            kong_frame_cnt = 0;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Kong Stand Animation for Levels 2-4
+// Both arms pumping motion
+// ============================================================================
+
+#[mode(m8, x8)]
+fn kong_stand_animation_level2() {
+    kong_frame_idx = kong_anim_both[kong_frame_cnt];
+
+    let frame: u8 = (game_frame_cnt & 255) as u8;
+
+    // Reset at specific frames for synced animation
+    if frame == 0 || frame == 35 || frame == 70 || frame == 90 {
+        kong_frame_cnt = 0;
+    }
+
+    if (game_frame_cnt & 3) == 0 {
+        kong_frame_cnt++;
+
+        if kong_frame_cnt == 4 {
+            // TODO: sfx_play(SFX_CHN+1, SFX_KONG_LEFT, kong_x+16);
+        }
+
+        if kong_frame_cnt > 5 {
+            kong_frame_cnt = 5;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Initialize Kong for Level Start
+// ============================================================================
+
+#[mode(m8, x8)]
+fn kong_init() {
+    kong_frame_cnt = 0;
+    kong_state = KONG_STATE_STAND;
+    kong_delay = 20;
+    kong_throw_wild_barrel = TRUE;
+    kong_frame_idx = KONG_ANIM_FACE1;
+    kong_start = TRUE;
+    kong_wild_barrel_type = game_loops % 3;
+
+    // Initialize difficulty counters
+    game_level_difficulty_count = 0;
+    game_bounce_delay = 0;
+}
+
+
+// ============================================================================
+// FUNCTION: Level 1 Kong Logic - Barrel Throwing
+// ============================================================================
+
+#[mode(m8, x8)]
+fn kong_process_level1() -> u8 {
+    let clear: u8 = 0;
+
+    // Delay between throws decreases with game loops
+    let delay: u16 = (game_loops as u16) * 8;
+    if delay > 32 {
+        delay = 32;
+    }
+
+    // Kong state machine for barrel throwing
+    if kong_state == KONG_STATE_STAND {
+        // Kong stands with idle animation
+        if kong_delay != 0 {
+            kong_delay--;
+        }
+
+        if kong_start == FALSE {
+            kong_stand_animation_level1();
+        }
+
+        if kong_delay == 0 {
+            let frame_check: u8 = kong_frame_cnt >> 2;
+            if frame_check == 0 || frame_check == 6 {
+                kong_start = FALSE;
+
+                // Show barrel in Kong's hand
+                let barrel_x: u8;
+                if game_flip == 0 {
+                    barrel_x = kong_x - 8;
+                } else {
+                    barrel_x = kong_x + 24;
+                }
+                oam_spr(barrel_x as u16, kong_y + 18, BARREL_TILE | BARREL_ATR, OAM_BARRELS + 16);
+
+                kong_state = KONG_STATE_TAKE;
+                if game_flip == 0 {
+                    kong_frame_idx = KONG_ANIM_SIDE_LEFT;
+                } else {
+                    kong_frame_idx = KONG_ANIM_SIDE_RIGHT;
+                }
+                kong_delay = 14;
+            }
+        }
+    } else if kong_state == KONG_STATE_TAKE {
+        // Kong takes a barrel
+        kong_delay--;
+
+        if kong_delay == 0 {
+            // Show barrel above head
+            oam_spr((kong_x + 8) as u16, kong_y + 18, BARREL_TILE + 0x08 | BARREL_ATR, OAM_BARRELS + 16);
+
+            kong_state = KONG_STATE_MIDDLE;
+            kong_frame_idx = KONG_ANIM_FACE1;
+            kong_delay = 12;
+        }
+    } else if kong_state == KONG_STATE_MIDDLE {
+        // Kong turns to drop side
+        kong_delay--;
+
+        if kong_delay == 0 {
+            if kong_throw_wild_barrel != 0 {
+                // Throw wild barrel
+                oam_spr(0, 240, 0, OAM_BARRELS + 16);
+
+                enemy_add(ENEMY_WILD_BARREL_DOWN + kong_wild_barrel_type, kong_x + 8, (kong_y + 18) as u8, 0);
+
+                kong_wild_barrel_type++;
+                if kong_wild_barrel_type > 2 {
+                    kong_wild_barrel_type = 0;
+                }
+
+                kong_throw_wild_barrel = FALSE;
+                kong_state = KONG_STATE_WAIT;
+                kong_frame_idx = KONG_ANIM_THROW;
+                kong_delay = 68;
+            } else {
+                // Show barrel on drop side
+                let barrel_x: u8;
+                if game_flip == 0 {
+                    barrel_x = kong_x + 24;
+                } else {
+                    barrel_x = kong_x - 8;
+                }
+                oam_spr(barrel_x as u16, kong_y + 18, BARREL_TILE | BARREL_ATR, OAM_BARRELS + 16);
+
+                kong_state = KONG_STATE_DROP;
+                if game_flip == 0 {
+                    kong_frame_idx = KONG_ANIM_SIDE_RIGHT;
+                } else {
+                    kong_frame_idx = KONG_ANIM_SIDE_LEFT;
+                }
+                kong_delay = 14;
+            }
+        }
+    } else if kong_state == KONG_STATE_DROP {
+        // Delay after drop
+        if kong_delay != 0 {
+            kong_delay--;
+        }
+
+        if kong_delay == 0 && enemy_all < ENEMY_MAX {
+            oam_spr(0, 240, 0, OAM_BARRELS + 16);
+
+            let barrel_x: u8;
+            let barrel_dx: i8;
+            if game_flip == 0 {
+                barrel_x = kong_x + 24;
+                barrel_dx = 1;
+            } else {
+                barrel_x = kong_x - 8;
+                barrel_dx = -1;
+            }
+            enemy_add(ENEMY_ROLLING_BARREL, barrel_x, (kong_y + 18) as u8, barrel_dx);
+
+            // TODO: sfx_play(SFX_CHN+1, SFX_BARREL_ROLL, kong_x+32);
+
+            kong_state = KONG_STATE_WAIT;
+            kong_delay = (68 - delay) as u8;
+        }
+    } else if kong_state == KONG_STATE_WAIT {
+        // Wait after throw
+        kong_delay--;
+
+        if kong_delay == 0 {
+            kong_state = KONG_STATE_STAND;
+            kong_delay = (64 - delay) as u8;
+            kong_frame_cnt = 0;
+        }
+    }
+
+    // Draw Kong
+    game_show_kong(OAM_KONG, kong_x, kong_y);
+
+    // Increase difficulty every 20 seconds
+    if game_level_difficulty_count < 1200 {
+        game_level_difficulty_count++;
+    } else {
+        game_level_difficulty_count = 0;
+
+        if game_level_difficulty < 5 {
+            game_level_difficulty++;
+        }
+
+        kong_throw_wild_barrel = TRUE;
+    }
+
+    // Barrel fire collision check
+    if barrel_fire != 0 {
+        if barrel_fire_x + 16 >= player_x + 4 {
+            if barrel_fire_x < player_x + 12 {
+                if barrel_fire_y + 8 >= player_y + 4 {
+                    if barrel_fire_y < player_y + 12 {
+                        clear = LEVEL_LOSE;
+                    }
+                }
+            }
+        }
+    }
+
+    // Level ends when player reaches top platform
+    if player_y == 16 {
+        clear = LEVEL_CLEAR;
+    }
+
+    return clear;
+}
+
+
+// ============================================================================
+// FUNCTION: Level 2 Kong Logic - Conveyor Belts
+// ============================================================================
+
+#[mode(m8, x8)]
+fn kong_process_level2() -> u8 {
+    let clear: u8 = 0;
+
+    kong_stand_animation_level2();
+    game_show_kong(OAM_KONG, kong_x, kong_y);
+
+    // Move Kong on conveyor
+    if (game_frame_cnt & 1) != 0 {
+        if conveyor_dir[0] != 0 {
+            kong_x++;
+        } else {
+            kong_x--;
+        }
+
+        // Change conveyor directions at boundaries
+        if kong_x < 26 || kong_x > 200 {
+            conveyor_dir[0] = conveyor_dir[0] ^ 1;
+            game_belts_update = TRUE;
+
+            if kong_x < 26 {
+                conveyor_dir[2] = conveyor_dir[2] ^ 1;
+                // TODO: sfx_play(SFX_CHN+3, SFX_SWITCH, 128);
+            }
+        }
+    }
+
+    // Barrel fire collision check
+    if barrel_fire_x + 12 >= player_x + 4 {
+        if barrel_fire_x + 4 < player_x + 12 {
+            if barrel_fire_y + 6 >= player_y + 4 {
+                if barrel_fire_y + 2 < player_y + 12 {
+                    clear = LEVEL_LOSE;
+                }
+            }
+        }
+    }
+
+    // Check Kong collision
+    if player_y < (kong_y + 28) as u8 {
+        if player_x + 12 > kong_x {
+            if player_x < kong_x + 28 {
+                clear = LEVEL_LOSE;
+            }
+        }
+    }
+
+    // Level ends when player reaches top platform
+    if player_y == 40 {
+        clear = LEVEL_CLEAR;
+    }
+
+    // Increase difficulty every 5 seconds, spawn fireballs
+    if game_level_difficulty_count < 300 {
+        game_level_difficulty_count++;
+    } else {
+        game_level_difficulty_count = 0;
+
+        if game_fireballs < game_fireballs_max {
+            game_fireballs++;
+            enemy_add(ENEMY_FIREBALL_1_SPAWN, barrel_fire_x, barrel_fire_y + 8, 0);
+            // TODO: sfx_play(SFX_CHN+2, SFX_FIRE_SPAWN, barrel_fire_x+8);
+        }
+    }
+
+    return clear;
+}
+
+
+// ============================================================================
+// FUNCTION: Level 3 Kong Logic - Elevators and Bounces
+// ============================================================================
+
+#[mode(m8, x8)]
+fn kong_process_level3() -> u8 {
+    let clear: u8 = 0;
+
+    kong_stand_animation_level2();
+    game_show_kong(OAM_KONG, kong_x, kong_y);
+
+    // Spawn bouncing springs
+    if game_bounce_delay == 0 {
+        let val: i16 = 180 - ((game_loops as i16) * 16);
+        if val < 64 {
+            val = 64;
+        }
+
+        game_bounce_delay = val as u16;
+
+        let random_off: u8 = ((rand() as u8) % ((game_loops + 1) as u8)) & 7;
+        let bounce_x: u8;
+        if game_flip == 0 {
+            bounce_x = (-16 + (random_off as i8)) as u8;
+        } else {
+            bounce_x = 256 - (random_off as u16) as u8;
+        }
+
+        enemy_add(ENEMY_BOUNCE, bounce_x, (kong_y + 18) as u8, 0);
+    } else {
+        game_bounce_delay--;
+    }
+
+    // Increase difficulty every 10 seconds
+    if game_level_difficulty_count < 600 {
+        game_level_difficulty_count++;
+    } else {
+        game_level_difficulty_count = 0;
+
+        if game_bounce_speed < 4 {
+            game_bounce_speed++;
+        }
+    }
+
+    // Level ends when player reaches top platform
+    if player_y == 16 {
+        clear = LEVEL_CLEAR;
+    }
+
+    return clear;
+}
+
+
+// ============================================================================
+// FUNCTION: Level 4 Kong Logic - Rivets
+// ============================================================================
+
+#[mode(m8, x8)]
+fn kong_process_level4() -> u8 {
+    let clear: u8 = 0;
+
+    kong_stand_animation_level2();
+    game_show_kong(OAM_KONG, kong_x, kong_y);
+
+    // Calculate difficulty interval (10s - game_loops/2, min 5s)
+    let val: i16 = (10 - ((game_loops as i16) / 2)) * 60;
+    if val < 300 {
+        val = 300;
+    }
+
+    // Increase difficulty and spawn fireballs
+    if game_level_difficulty_count < val as u16 {
+        game_level_difficulty_count++;
+    } else {
+        game_level_difficulty_count = 0;
+
+        if game_fireballs < game_fireballs_max {
+            game_fireballs++;
+
+            // Find suitable spawn point
+            let spawn_idx: u8 = (rand() as u8) % fireball_spawn_all;
+            let fx: u8 = fireball_spawn_x[spawn_idx];
+            let fy: u8 = fireball_spawn_y[spawn_idx];
+
+            enemy_add(ENEMY_FIREBALL_2, fx, fy, 0);
+            // TODO: sfx_play(SFX_CHN+2, SFX_FIRE_SPAWN, fx+8);
+        }
+    }
+
+    // Check Kong collision
+    if player_y < (kong_y + 28) as u8 {
+        if player_x + 12 > kong_x {
+            if player_x < kong_x + 28 {
+                clear = LEVEL_LOSE;
+            }
+        }
+    }
+
+    // Level ends when all rivets removed
+    if game_rivets == 8 {
+        clear = LEVEL_CLEAR;
+    }
+
+    return clear;
+}
+
+
+// ============================================================================
+// FUNCTION: Process Kong Based on Current Level
+// ============================================================================
+
+#[mode(m8, x8)]
+fn kong_process() -> u8 {
+    if game_level == 0 {
+        return kong_process_level1();
+    } else if game_level == 1 {
+        return kong_process_level2();
+    } else if game_level == 2 {
+        return kong_process_level3();
+    } else {
+        return kong_process_level4();
+    }
+}

@@ -1,0 +1,598 @@
+// ============================================================================
+// Classic Kong Complete - Items and Particles System
+// ============================================================================
+// Handles collectible items, score particles, and elevators
+// ============================================================================
+
+// ============================================================================
+// CONSTANTS - Item Types
+// ============================================================================
+
+const ITEMS_MAX: u8 = 6;
+
+const ITEM_NONE: u8 = 0;
+const ITEM_HAMMER: u8 = 1;
+const ITEM_UMBRELLA: u8 = 2;
+const ITEM_BAG: u8 = 3;
+const ITEM_HEART: u8 = 4;
+const ITEM_ELEVATOR: u8 = 5;
+
+
+// ============================================================================
+// CONSTANTS - Particle Types
+// ============================================================================
+
+const PARTICLES_MAX: u8 = 4;
+
+const PART_TYPE_NONE: u8 = 0;
+const PART_TYPE_100: u8 = 1;
+const PART_TYPE_300: u8 = 2;
+const PART_TYPE_500: u8 = 3;
+const PART_TYPE_800: u8 = 4;
+const PART_TYPE_HELP: u8 = 5;
+const PART_TYPE_SMOKE: u8 = 6;
+const PART_TYPE_SMOKE_UP: u8 = 7;
+const PART_TYPE_HEART: u8 = 8;
+
+
+// ============================================================================
+// CONSTANTS - Elevators
+// ============================================================================
+
+const ELEVATORS_MAX: u8 = 6;
+
+
+// ============================================================================
+// ITEM STATE VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut items_all: u8;
+
+#[ram]
+static mut item_type: [u8; 6];
+
+#[ram]
+static mut item_x: [u8; 6];
+
+#[ram]
+static mut item_y: [u8; 6];
+
+
+// ============================================================================
+// PARTICLE STATE VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut particle_free: u8;
+
+#[ram]
+static mut particle_type: [u8; 4];
+
+#[ram]
+static mut particle_x: [u8; 4];
+
+#[ram]
+static mut particle_y: [u8; 4];
+
+#[ram]
+static mut particle_cnt1: [u8; 4];
+
+#[ram]
+static mut particle_cnt2: [u8; 4];
+
+#[ram]
+static mut particle_spr: [u16; 4];
+
+
+// ============================================================================
+// ELEVATOR STATE VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut elevators_all: u8;
+
+#[ram]
+static mut elevator_x: [i16; 6];
+
+#[ram]
+static mut elevator_y: [i16; 6];
+
+#[ram]
+static mut elevator_dy: [i16; 6];
+
+#[lowram]
+static mut elevator_top: u8;
+
+#[lowram]
+static mut elevator_bottom: u8;
+
+
+// ============================================================================
+// SPRITE TABLES
+// ============================================================================
+
+static item_sprite_table: [u16; 5] = [
+    0,
+    ITEMS_TILE + 0x00 | ITEM_ATR,    // Hammer
+    ITEMS_TILE + 0x02 | ITEM_ATR,    // Umbrella
+    ITEMS_TILE + 0x04 | ITEM_ATR,    // Bag
+    ITEMS_TILE + 0x06 | ITEM_ATR     // Heart
+];
+
+
+// ============================================================================
+// FUNCTION: Clear Particle
+// ============================================================================
+
+#[mode(m8, x8)]
+fn particle_clear(id @ A: u8) {
+    particle_type[id] = PART_TYPE_NONE;
+    oam_spr1(0, 240, 0, OAM_PARTICLES + ((id as u16) << 2));
+    particle_free = id;
+}
+
+
+// ============================================================================
+// FUNCTION: Clear All Particles
+// ============================================================================
+
+#[mode(m8, x8)]
+fn particles_clear() {
+    let i: u8 = 0;
+    loop {
+        particle_type[i] = PART_TYPE_NONE;
+        particle_clear(i);
+        i++;
+        if i >= PARTICLES_MAX {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Add Particle
+// ============================================================================
+
+#[mode(m8, x8)]
+fn particle_add(ptype @ A: u8, px: u8, py: u8) {
+    let i: u8 = particle_free;
+    let j: u8 = 0;
+    let cnt1: u8 = 0;
+    let cnt2: u8 = 0;
+    let spr: u16 = 0;
+
+    loop {
+        if particle_type[i] != PART_TYPE_NONE {
+            i++;
+            if i >= PARTICLES_MAX {
+                i = 0;
+            }
+            j++;
+            if j >= PARTICLES_MAX {
+                return;  // No room
+            }
+            continue;
+        }
+
+        particle_type[i] = ptype;
+        particle_x[i] = px;
+        particle_y[i] = py;
+
+        if ptype == PART_TYPE_100 {
+            cnt1 = 50;
+            spr = ITEMS_TILE + 0x20 | ITEM_ATR;
+        } else if ptype == PART_TYPE_300 {
+            cnt1 = 50;
+            spr = ITEMS_TILE + 0x0A | ITEM_ATR;
+        } else if ptype == PART_TYPE_500 {
+            cnt1 = 50;
+            spr = ITEMS_TILE + 0x0C | ITEM_ATR;
+        } else if ptype == PART_TYPE_800 {
+            cnt1 = 50;
+            spr = ITEMS_TILE + 0x0E | ITEM_ATR;
+        } else if ptype == PART_TYPE_HELP {
+            cnt1 = 32;
+            spr = PRINCESS_TILE + 0x08 | PRINCESS_ATR;
+        } else if ptype == PART_TYPE_SMOKE || ptype == PART_TYPE_SMOKE_UP {
+            cnt1 = 32;
+            spr = ENEMY_TILE + 0x40 | ENEMY_ATR;
+        } else if ptype == PART_TYPE_HEART {
+            cnt1 = 8;
+            cnt2 = 64;
+            spr = PRINCESS_TILE + 0x0C | PRINCESS_ATR;
+        }
+
+        particle_cnt1[i] = cnt1;
+        particle_cnt2[i] = cnt2;
+        particle_spr[i] = spr;
+
+        break;
+    }
+
+    particle_free++;
+    if particle_free >= PARTICLES_MAX {
+        particle_free = 0;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Process Particles
+// ============================================================================
+
+#[mode(m8, x8)]
+fn particle_process() {
+    let spr: u16 = OAM_PARTICLES;
+    let frame: u8 = game_frame_cnt as u8;
+    let i: u8 = 0;
+
+    loop {
+        let ptype: u8 = particle_type[i];
+
+        if ptype == PART_TYPE_NONE {
+            spr = spr + 4;
+            i++;
+            if i >= PARTICLES_MAX {
+                break;
+            }
+            continue;
+        }
+
+        if ptype == PART_TYPE_100 || ptype == PART_TYPE_300 ||
+           ptype == PART_TYPE_500 || ptype == PART_TYPE_800 {
+            // Score particles rise slowly
+            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
+
+            particle_cnt1[i]--;
+
+            if particle_cnt1[i] == 0 {
+                particle_clear(i);
+            } else {
+                if (frame & 1) != 0 {
+                    particle_y[i]--;
+                }
+            }
+        } else if ptype == PART_TYPE_HELP {
+            // Help text rises slower
+            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
+
+            particle_cnt1[i]--;
+
+            if particle_cnt1[i] == 0 {
+                particle_clear(i);
+            } else {
+                if (frame & 3) == 0 {
+                    particle_y[i]--;
+                }
+            }
+        } else if ptype == PART_TYPE_SMOKE_UP {
+            // Rising smoke
+            particle_y[i]--;
+
+            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
+
+            particle_cnt1[i]--;
+
+            if particle_cnt1[i] == 0 {
+                particle_clear(i);
+            } else {
+                if (particle_cnt1[i] & 3) == 0 {
+                    particle_spr[i] = particle_spr[i] + 2;
+                }
+            }
+        } else if ptype == PART_TYPE_SMOKE {
+            // Stationary smoke
+            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
+
+            particle_cnt1[i]--;
+
+            if particle_cnt1[i] == 0 {
+                particle_clear(i);
+            } else {
+                if (particle_cnt1[i] & 3) == 0 {
+                    particle_spr[i] = particle_spr[i] + 2;
+                }
+            }
+        } else if ptype == PART_TYPE_HEART {
+            // Heart floats up and sways
+            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
+
+            if (particle_cnt2[i] & 3) == 0 && (frame & 1) != 0 {
+                particle_y[i]--;
+            }
+
+            if particle_cnt2[i] == 0 {
+                if (particle_cnt1[i] & 16) != 0 {
+                    particle_x[i]--;
+                } else {
+                    particle_x[i]++;
+                }
+            }
+
+            particle_cnt1[i]++;
+
+            if particle_cnt2[i] != 0 {
+                particle_cnt2[i] = particle_cnt2[i] - 2;
+            }
+
+            particle_spr[i] = PRINCESS_TILE + 0x0C + (particle_cnt2[i] & 2) as u16 | PRINCESS_ATR;
+
+            if particle_y[i] == 240 {
+                particle_clear(i);
+            }
+        }
+
+        spr = spr + 4;
+        i++;
+        if i >= PARTICLES_MAX {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Clear All Items
+// ============================================================================
+
+#[mode(m8, x8)]
+fn items_clear() {
+    let i: u8 = 0;
+    loop {
+        item_type[i] = ITEM_NONE;
+        oam_spr1(0, 240, 0, OAM_ITEMS + ((i as u16) << 2));
+        i++;
+        if i >= ITEMS_MAX {
+            break;
+        }
+    }
+    items_all = 0;
+}
+
+
+// ============================================================================
+// FUNCTION: Add Item
+// ============================================================================
+
+#[mode(m8, x8)]
+fn game_item_add(x @ A: u8, y: u8, itype: u8) {
+    if items_all >= ITEMS_MAX {
+        return;
+    }
+
+    item_type[items_all] = itype;
+    item_x[items_all] = x;
+    item_y[items_all] = y;
+
+    items_all++;
+}
+
+
+// ============================================================================
+// FUNCTION: Draw Items
+// ============================================================================
+
+#[mode(m8, x8)]
+fn items_draw() {
+    let spr: u16 = OAM_ITEMS;
+    let i: u8 = 0;
+
+    loop {
+        let itype: u8 = item_type[i];
+
+        if itype != ITEM_NONE && itype != ITEM_ELEVATOR {
+            oam_spr1(item_x[i], item_y[i], item_sprite_table[itype], spr);
+        } else {
+            oam_spr1(0, 240, 0, spr);
+        }
+
+        spr = spr + 4;
+        i++;
+        if i >= ITEMS_MAX {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Check Item Collisions with Player
+// Returns TRUE if animation should pause
+// ============================================================================
+
+#[mode(m8, x8)]
+fn items_check_collision() -> u8 {
+    let anim: u8 = FALSE;
+    let i: u8 = 0;
+
+    loop {
+        let itype: u8 = item_type[i];
+
+        if itype == ITEM_NONE || itype == ITEM_ELEVATOR {
+            i++;
+            if i >= items_all {
+                break;
+            }
+            continue;
+        }
+
+        if itype == ITEM_HAMMER {
+            // Check if player touches hammer
+            if item_y[i] + 8 > player_y + 2 {
+                if item_y[i] < player_y + 14 {
+                    if item_x[i] + 8 > player_x {
+                        if item_x[i] < player_x + 16 {
+                            // Got hammer!
+                            item_type[i] = ITEM_NONE;
+                            anim = TRUE;
+
+                            player_hammer_time = 600;  // 10 seconds at 60fps
+                            // TODO: sfx_play(SFX_CHN, SFX_HAMMER, item_x[i]);
+                            // TODO: music_play(MUSIC_HAMMER);
+                        }
+                    }
+                }
+            }
+        } else if itype == ITEM_UMBRELLA || itype == ITEM_BAG || itype == ITEM_HEART {
+            // Other items give score
+            if item_y[i] + 8 >= player_y + 4 {
+                if item_y[i] <= player_y + 12 {
+                    if item_x[i] + 8 >= player_x + 4 {
+                        if item_x[i] <= player_x + 12 {
+                            // Got item!
+                            let score: u16;
+                            let particle: u8;
+
+                            if itype == ITEM_UMBRELLA {
+                                score = 300;
+                                particle = PART_TYPE_300;
+                            } else if itype == ITEM_BAG {
+                                score = 500;
+                                particle = PART_TYPE_500;
+                            } else {
+                                score = 800;
+                                particle = PART_TYPE_800;
+                            }
+
+                            // TODO: game_add_score(score);
+                            particle_add(particle, item_x[i], item_y[i]);
+
+                            item_type[i] = ITEM_NONE;
+                            anim = TRUE;
+
+                            // TODO: sfx_play(SFX_CHN+1, SFX_ITEM, item_x[i]);
+                        }
+                    }
+                }
+            }
+        }
+
+        i++;
+        if i >= items_all {
+            break;
+        }
+    }
+
+    return anim;
+}
+
+
+// ============================================================================
+// FUNCTION: Clear All Elevators
+// ============================================================================
+
+#[mode(m8, x8)]
+fn elevators_clear() {
+    let i: u8 = 0;
+    loop {
+        elevator_x[i] = 0;
+        elevator_y[i] = 0;
+        elevator_dy[i] = 0;
+        oam_spr1(0, 240, 0, OAM_ELEVATORS + ((i as u16) << 2));
+        i++;
+        if i >= ELEVATORS_MAX {
+            break;
+        }
+    }
+    elevators_all = 0;
+    elevator_top = 0;
+    elevator_bottom = 224;
+}
+
+
+// ============================================================================
+// FUNCTION: Add Elevator
+// ============================================================================
+
+#[mode(m8, x8)]
+fn elevator_add(x @ A: u8, y: u8, dy: i8) {
+    if elevators_all >= ELEVATORS_MAX {
+        return;
+    }
+
+    elevator_x[elevators_all] = x as i16;
+    elevator_y[elevators_all] = y as i16;
+    elevator_dy[elevators_all] = dy as i16;
+
+    elevators_all++;
+}
+
+
+// ============================================================================
+// FUNCTION: Process Elevators
+// ============================================================================
+
+#[mode(m8, x16)]
+fn elevators_process() {
+    let spr: u16 = OAM_ELEVATORS;
+    let i: u8 = 0;
+
+    loop {
+        if i >= elevators_all {
+            break;
+        }
+
+        // Clear old walkmap entry
+        let ey: i16 = elevator_y[i];
+        if ey < (elevator_bottom as i16) - 4 {
+            let off: u16 = ((ey as u16) << 5) + ((elevator_x[i] as u16) >> 3);
+            walkmap[off] = 0;
+            walkmap[off + 1] = 0;
+            walkmap[off + 2] = 0;
+        }
+
+        // Move elevator
+        elevator_y[i] = ey + elevator_dy[i];
+        ey = elevator_y[i];
+
+        // Wrap around
+        if ey < elevator_top as i16 {
+            elevator_y[i] = elevator_bottom as i16;
+            ey = elevator_y[i];
+        }
+        if ey > elevator_bottom as i16 {
+            elevator_y[i] = elevator_top as i16;
+            ey = elevator_y[i];
+        }
+
+        // Set new walkmap entry
+        if ey < (elevator_bottom as i16) - 4 {
+            let off: u16 = ((ey as u16) << 5) + ((elevator_x[i] as u16) >> 3);
+            walkmap[off] = T_ELEVATOR;
+            walkmap[off + 1] = T_ELEVATOR;
+            walkmap[off + 2] = T_ELEVATOR;
+        }
+
+        // Draw elevator sprite
+        oam_spr1(elevator_x[i] as u8, (ey - 1) as u8,
+                 ITEMS_TILE + 0x08 | ITEM_ATR, spr);
+
+        spr = spr + 4;
+        i++;
+    }
+
+    // Hide unused elevator sprites
+    loop {
+        if i >= ELEVATORS_MAX {
+            break;
+        }
+        oam_spr1(0, 240, 0, spr);
+        spr = spr + 4;
+        i++;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Initialize Item/Particle System
+// ============================================================================
+
+#[mode(m8, x8)]
+fn items_init() {
+    items_clear();
+    particles_clear();
+    elevators_clear();
+    particle_free = 0;
+}

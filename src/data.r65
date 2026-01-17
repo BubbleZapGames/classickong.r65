@@ -1,0 +1,199 @@
+// ============================================================================
+// Classic Kong Complete - Data Declarations
+// ============================================================================
+// Binary asset inclusion for graphics, palettes, sounds, and level data
+// ============================================================================
+
+// ============================================================================
+// GRAPHICS DATA (CHR format - 4bpp SNES tiles)
+// ============================================================================
+
+// Font graphics (2KB)
+#[bank(1)]
+static font_gfx: [u8; 2048] = include_bytes!("../assets/gfx/font.chr");
+
+// Tileset graphics for levels
+#[bank(1)]
+static tileset1_gfx: [u8; 2048] = include_bytes!("../assets/gfx/tileset1.chr");
+
+#[bank(1)]
+static tileset2_gfx: [u8; 2048] = include_bytes!("../assets/gfx/tileset2.chr");
+
+#[bank(1)]
+static tileset2alt_gfx: [u8; 2048] = include_bytes!("../assets/gfx/tileset2alt.chr");
+
+// Sprite graphics
+#[bank(1)]
+static sprites1_gfx: [u8; 3072] = include_bytes!("../assets/gfx/sprites1.chr");  // Player
+
+#[bank(1)]
+static sprites2_gfx: [u8; 2048] = include_bytes!("../assets/gfx/sprites2.chr");  // Items
+
+#[bank(1)]
+static sprites3_gfx: [u8; 5120] = include_bytes!("../assets/gfx/sprites3.chr");  // Kong
+
+#[bank(1)]
+static sprites4_gfx: [u8; 1024] = include_bytes!("../assets/gfx/sprites4.chr");  // Barrels
+
+#[bank(1)]
+static sprites5_gfx: [u8; 4096] = include_bytes!("../assets/gfx/sprites5.chr");  // Enemies
+
+#[bank(1)]
+static sprites6_gfx: [u8; 1024] = include_bytes!("../assets/gfx/sprites6.chr");  // Princess
+
+// Background graphics
+#[bank(2)]
+static back1_gfx: [u8; 24576] = include_bytes!("../assets/gfx/back1.chr");
+
+// Title screen graphics
+#[bank(2)]
+static title_top_gfx: [u8; 2400] = include_bytes!("../assets/gfx/title_top.chr");
+
+#[bank(2)]
+static title_bottom_gfx: [u8; 6912] = include_bytes!("../assets/gfx/title_bottom.chr");
+
+// Logo graphics
+#[bank(2)]
+static bzlogo_gfx: [u8; 7168] = include_bytes!("../assets/gfx/bubblezaplogo.chr");
+
+
+// ============================================================================
+// PALETTE DATA (SNES BGR555 format - 32 bytes per 16-color palette)
+// ============================================================================
+
+// Font palette
+#[bank(1)]
+static font_pal: [u8; 32] = include_bytes!("../assets/gfx/font.pal");
+
+// Tileset palettes
+#[bank(1)]
+static tileset1_pal: [u8; 32] = include_bytes!("../assets/gfx/tileset1.pal");
+
+#[bank(1)]
+static tileset1alt1_pal: [u8; 32] = include_bytes!("../assets/gfx/tileset1alt1.pal");
+
+#[bank(1)]
+static tileset1alt2_pal: [u8; 32] = include_bytes!("../assets/gfx/tileset1alt2.pal");
+
+#[bank(1)]
+static tileset2_pal: [u8; 32] = include_bytes!("../assets/gfx/tileset2.pal");
+
+#[bank(1)]
+static tileset2alt_pal: [u8; 32] = include_bytes!("../assets/gfx/tileset2alt.pal");
+
+// Sprite palettes
+#[bank(1)]
+static sprites1_pal: [u8; 32] = include_bytes!("../assets/gfx/sprites1.pal");  // Player
+
+#[bank(1)]
+static sprites2_pal: [u8; 32] = include_bytes!("../assets/gfx/sprites2.pal");  // Items
+
+#[bank(1)]
+static sprites3_pal: [u8; 32] = include_bytes!("../assets/gfx/sprites3.pal");  // Kong
+
+#[bank(1)]
+static sprites4_pal: [u8; 32] = include_bytes!("../assets/gfx/sprites4.pal");  // Barrels
+
+#[bank(1)]
+static sprites5_pal: [u8; 32] = include_bytes!("../assets/gfx/sprites5.pal");  // Enemies
+
+#[bank(1)]
+static sprites5alt_pal: [u8; 32] = include_bytes!("../assets/gfx/sprites5alt.pal");
+
+#[bank(1)]
+static sprites6_pal: [u8; 32] = include_bytes!("../assets/gfx/sprites6.pal");  // Princess
+
+// Background palette
+#[bank(1)]
+static back1_pal: [u8; 32] = include_bytes!("../assets/gfx/back1.pal");
+
+// Title screen palettes
+#[bank(1)]
+static title_top_pal: [u8; 32] = include_bytes!("../assets/gfx/title_top.pal");
+
+#[bank(1)]
+static title_bottom_pal: [u8; 32] = include_bytes!("../assets/gfx/title_bottom.pal");
+
+// Logo palette (256 colors = 512 bytes)
+#[bank(2)]
+static bzlogo_pal: [u8; 512] = include_bytes!("../assets/gfx/bubblezaplogo.pal");
+
+
+// ============================================================================
+// LEVEL DATA (RLE-compressed nametables)
+// ============================================================================
+
+#[bank(1)]
+static map1_data: [u8; 524] = include_bytes!("../assets/levels/map1.rle");
+
+#[bank(1)]
+static map2_data: [u8; 422] = include_bytes!("../assets/levels/map2.rle");
+
+#[bank(1)]
+static map3_data: [u8; 505] = include_bytes!("../assets/levels/map3.rle");
+
+#[bank(1)]
+static map4_data: [u8; 365] = include_bytes!("../assets/levels/map4.rle");
+
+#[bank(1)]
+static mape_data: [u8; 186] = include_bytes!("../assets/levels/mape.rle");
+
+#[bank(1)]
+static mapi_data: [u8; 96] = include_bytes!("../assets/levels/mapi.rle");
+
+
+// ============================================================================
+// SOUND DATA
+// ============================================================================
+
+// SPC700 driver code (includes all samples)
+#[bank(3)]
+static spc700_data: [u8; 32579] = include_bytes!("../assets/sound/spc700.bin");
+
+// Sound effects data
+#[bank(3)]
+static sounds_data: [u8; 1281] = include_bytes!("../assets/sound/sounds.bin");
+
+// Music tracks
+#[bank(3)]
+static music_title_data: [u8; 535] = include_bytes!("../assets/sound/music_title.bin");
+
+#[bank(3)]
+static music_game_start_data: [u8; 236] = include_bytes!("../assets/sound/music_game_start.bin");
+
+#[bank(3)]
+static music_stage_start_data: [u8; 132] = include_bytes!("../assets/sound/music_stage_start.bin");
+
+#[bank(3)]
+static music_stage_clear_data: [u8; 117] = include_bytes!("../assets/sound/music_stage_clear.bin");
+
+#[bank(3)]
+static music_hammer_data: [u8; 148] = include_bytes!("../assets/sound/music_hammer.bin");
+
+#[bank(3)]
+static music_level1_data: [u8; 266] = include_bytes!("../assets/sound/music_level1.bin");
+
+#[bank(3)]
+static music_lose_data: [u8; 348] = include_bytes!("../assets/sound/music_lose.bin");
+
+#[bank(3)]
+static music_time_out_data: [u8; 100] = include_bytes!("../assets/sound/music_time_out.bin");
+
+#[bank(3)]
+static music_victory_data: [u8; 327] = include_bytes!("../assets/sound/music_victory.bin");
+
+
+// ============================================================================
+// MUSIC SIZE CONSTANTS (for the music player)
+// ============================================================================
+
+const MUSIC_TITLE_SIZE: u16 = 535;
+const MUSIC_GAME_START_SIZE: u16 = 236;
+const MUSIC_STAGE_START_SIZE: u16 = 132;
+const MUSIC_STAGE_CLEAR_SIZE: u16 = 117;
+const MUSIC_HAMMER_SIZE: u16 = 148;
+const MUSIC_LEVEL1_SIZE: u16 = 266;
+const MUSIC_LOSE_SIZE: u16 = 348;
+const MUSIC_TIME_OUT_SIZE: u16 = 100;
+const MUSIC_VICTORY_SIZE: u16 = 327;
+const SPC700_SIZE: u16 = 32579;

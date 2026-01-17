@@ -1,0 +1,734 @@
+// ============================================================================
+// Classic Kong Complete - Main Entry Point
+// ============================================================================
+// SNES LoROM port of Classic Kong from the original C/ASM source
+// ============================================================================
+
+#[snesrom(name = "CLASSIC KONG", lorom, fastrom)]
+
+// Include standard libraries
+include!("lib/sneslib.r65")
+include!("lib/math.r65")
+include!("lib/65816.r65")
+
+// Include game data
+include!("data.r65")
+
+// Include game framework
+include!("game.r65")
+
+// Include player control
+include!("player.r65")
+
+// Include enemy system
+include!("enemy.r65")
+
+// Include items and particles
+include!("items.r65")
+
+// Include Kong AI and animation
+include!("kong.r65")
+
+// Include cutscenes and title screen
+include!("cutscenes.r65")
+
+// Include sound and music
+include!("sound.r65")
+
+
+// ============================================================================
+// GAME STATE VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut global_stereo: u8;
+
+#[lowram]
+static mut global_volume: u8;
+
+#[lowram]
+static mut game_frame_cnt: u16;
+
+#[lowram]
+static mut game_bg_anim: u16;
+
+#[lowram]
+static mut game_level: u8;
+
+#[lowram]
+static mut game_lives: u8;
+
+#[lowram]
+static mut game_rivets: u8;
+
+#[lowram]
+static mut game_score: u32;
+
+#[lowram]
+static mut game_best_score: u32;
+
+#[lowram]
+static mut game_loops: u8;
+
+#[lowram]
+static mut game_bonus: u16;
+
+#[lowram]
+static mut game_flip: u8;
+
+#[lowram]
+static mut game_test_mode: u8;
+
+#[lowram]
+static mut game_hard_mode: u8;
+
+
+// ============================================================================
+// CONSTANTS - Level Clear States
+// ============================================================================
+
+const LEVEL_CLEAR: u8 = 1;
+const LEVEL_LOSE: u8 = 2;
+const LEVEL_LOSE_WINCH: u8 = 3;
+const LEVEL_LOSE_TIME_OUT: u8 = 4;
+
+
+// ============================================================================
+// CONSTANTS - Tile Collision Flags
+// ============================================================================
+
+const T_FLOOR: u8 = 1;
+const T_LADDER: u8 = 2;
+const T_LADDER_BROKEN: u8 = 4;
+const T_RIVET: u8 = 8;
+const T_ELEVATOR: u8 = 16;
+
+const T_LDRTOP: u8 = T_LADDER | T_FLOOR;
+const T_SOLID: u8 = T_FLOOR | T_RIVET | T_ELEVATOR;
+
+
+// ============================================================================
+// CONSTANTS - VRAM Offsets for Sprite Graphics
+// ============================================================================
+
+const PLAYER_TILE: u16 = 0;
+const ITEMS_TILE: u16 = PLAYER_TILE + 96;   // 3072 >> 5
+const KONG_TILE: u16 = ITEMS_TILE + 64;     // 2048 >> 5
+const BARREL_TILE: u16 = KONG_TILE + 160;   // 5120 >> 5
+const ENEMY_TILE: u16 = BARREL_TILE + 32;   // 1024 >> 5
+const PRINCESS_TILE: u16 = ENEMY_TILE + 128; // 4096 >> 5
+
+
+// ============================================================================
+// CONSTANTS - Sprite Attributes
+// ============================================================================
+
+const PLAYER_ATR: u16 = SPR_PAL!(0) | SPR_PRI!(2);
+const ITEM_ATR: u16 = SPR_PAL!(1) | SPR_PRI!(2);
+const KONG_ATR: u16 = SPR_PAL!(2) | SPR_PRI!(2);
+const PRINCESS_ATR: u16 = SPR_PAL!(5) | SPR_PRI!(2);
+const BARREL_ATR: u16 = SPR_PAL!(3) | SPR_PRI!(2);
+const ENEMY_ATR: u16 = SPR_PAL!(4) | SPR_PRI!(2);
+const GAMEOVER_ATR: u16 = SPR_PAL!(7) | SPR_PRI!(3);
+
+
+// ============================================================================
+// CONSTANTS - OAM Offsets
+// ============================================================================
+
+const OAM_GAMEOVER: u16 = 0 << 2;     // 8 sprites
+const OAM_SPLAT: u16 = 8 << 2;        // 1 sprite
+const OAM_HAMMER: u16 = 9 << 2;       // 2 sprites
+const OAM_PLAYER: u16 = 11 << 2;      // 1 sprite
+const OAM_ENEMY: u16 = 12 << 2;       // 16 sprites
+const OAM_PARTICLES: u16 = 28 << 2;   // 4 sprites
+const OAM_ITEMS: u16 = 32 << 2;       // 6 sprites
+const OAM_ELEVATORS: u16 = 38 << 2;   // 6 sprites
+const OAM_BARRELS: u16 = 44 << 2;     // 5 sprites
+const OAM_KONG: u16 = 49 << 2;        // 5 sprites
+const OAM_PRINCESS: u16 = 54 << 2;    // 3 sprites
+const OAM_LADDERS: u16 = 57 << 2;     // 2 sprites
+
+
+// ============================================================================
+// FUNCTION: Setup Game Palettes
+// ============================================================================
+
+#[mode(m8, x8)]
+fn setup_palettes() {
+    // Font palette (colors 0-15)
+    set_palette(0, 16, &font_pal as far *u16);
+
+    // Tileset palettes
+    set_palette(16, 16, &tileset1_pal as far *u16);
+    set_palette(32, 16, &tileset2_pal as far *u16);
+
+    // Title screen palettes
+    set_palette(80, 16, &title_top_pal as far *u16);
+    set_palette(96, 16, &title_bottom_pal as far *u16);
+
+    // Sprite palettes (start at 128 for OBJ)
+    set_palette(128, 16, &sprites1_pal as far *u16);  // Player
+    set_palette(144, 16, &sprites2_pal as far *u16);  // Items
+    set_palette(160, 16, &sprites3_pal as far *u16);  // Kong
+    set_palette(176, 16, &sprites4_pal as far *u16);  // Barrels
+    set_palette(192, 16, &sprites5_pal as far *u16);  // Enemies
+    set_palette(208, 16, &sprites6_pal as far *u16);  // Princess
+    set_palette(240, 16, &sprites2_pal as far *u16);  // Game over text
+}
+
+
+// ============================================================================
+// FUNCTION: Setup In-Game Graphics
+// ============================================================================
+
+#[mode(m8, x8)]
+fn setup_ingame_graphics() {
+    let offset: u16 = 0x2000;
+
+    copy_to_vram(offset + (PLAYER_TILE << 4), &sprites1_gfx as far *u8, 3072, 0);
+    copy_to_vram(offset + (ITEMS_TILE << 4), &sprites2_gfx as far *u8, 2048, 0);
+    copy_to_vram(offset + (KONG_TILE << 4), &sprites3_gfx as far *u8, 5120, 0);
+    copy_to_vram(offset + (BARREL_TILE << 4), &sprites4_gfx as far *u8, 1024, 0);
+    copy_to_vram(offset + (ENEMY_TILE << 4), &sprites5_gfx as far *u8, 4096, 0);
+    copy_to_vram(offset + (PRINCESS_TILE << 4), &sprites6_gfx as far *u8, 1024, 0);
+}
+
+
+// ============================================================================
+// FUNCTION: Show Company Logo
+// ============================================================================
+
+#[mode(m8, x8)]
+fn show_logo() {
+    // Set mode 3 for 256-color logo
+    BGMODE = 0x0B;  // Mode 3, 2 layers
+
+    // Nametable setup
+    BG1SC = 0 << 2;
+    BG2SC = 1 << 2;
+    BG12NBA = 0x70;  // Patterns at $7000
+
+    // Copy logo graphics to VRAM
+    copy_to_vram(0x0800, &bzlogo_gfx as far *u8, 7168, 0);
+
+    // Copy logo palette (256 colors)
+    set_palette(0, 256, &bzlogo_pal as far *u16);
+
+    // Clear nametables
+    clear_nametables();
+
+    // Set up logo tiles in nametable
+    let n: u16 = 64;
+    let row: u8 = 0;
+
+    loop {
+        let col: u8 = 0;
+        loop {
+            let pos: u16 = POS!(2 + col, 12 + row);
+            nametable1[pos] = n;
+            n++;
+            col++;
+            if col >= 28 {
+                break;
+            }
+        }
+        row++;
+        if row >= 4 {
+            break;
+        }
+    }
+
+    update_nametables();
+    update_palette();
+
+    // Fade in
+    let bright: u8 = 0;
+    let pixel: u8 = 0;
+
+    loop {
+        nmi_wait();
+
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        set_pixelize(pixel >> 1);
+        pixel++;
+
+        if pixel >= 34 {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Fade Screen In or Out
+// ============================================================================
+
+#[mode(m8, x8)]
+fn fade_screen(fade_in @ A: u8, with_sound: u8) {
+    let level: u8 = 1;
+
+    loop {
+        nmi_wait();
+
+        if fade_in != 0 {
+            set_bright(level);
+        } else {
+            set_bright(15 - level);
+        }
+
+        level++;
+        if level >= 16 {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Show PAL Warning Screen
+// ============================================================================
+
+#[mode(m8, x8)]
+fn show_pal_warning() {
+    set_bright(0);
+    oam_clear();
+    clear_nametables();
+
+    put_str(&nametable1[POS!(6, 7)] as *u16, "PAL SYSTEM DETECTED!" as far *u8);
+    put_str(&nametable1[POS!(1, 11)] as *u16, "THIS GAME IS DESIGNED FOR NTSC" as far *u8);
+    put_str(&nametable1[POS!(1, 13)] as *u16, "SYSTEM ONLY.  IT WILL RUN, BUT" as far *u8);
+    put_str(&nametable1[POS!(1, 15)] as *u16, "SLOWER THAN INTENDED. SORRY." as far *u8);
+    put_str(&nametable1[POS!(4, 19)] as *u16, "PRESS START TO CONTINUE" as far *u8);
+
+    update_nametables();
+    setup_palettes();
+    update_palette();
+
+    let bright: u8 = 0;
+
+    loop {
+        nmi_wait();
+
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        pad_read_ports();
+
+        let trig: u16 = pad_poll_trigger(0);
+        if trig & PAD_START != 0 {
+            break;
+        }
+    }
+
+    fade_screen(0, 1);
+}
+
+
+// ============================================================================
+// FUNCTION: Title Screen (placeholder)
+// ============================================================================
+
+#[mode(m8, x8)]
+fn title_screen() -> u8 {
+    set_bright(0);
+    oam_clear();
+    clear_nametables();
+
+    // Display title text
+    put_str(&nametable1[POS!(8, 8)] as *u16, "CLASSIC KONG" as far *u8);
+    put_str(&nametable1[POS!(6, 12)] as *u16, "PRESS START" as far *u8);
+
+    // Load font graphics
+    copy_to_vram(0x1000, &font_gfx as far *u8, 2048, 0);
+
+    update_nametables();
+    setup_palettes();
+    update_palette();
+
+    // Fade in
+    let bright: u8 = 0;
+    loop {
+        nmi_wait();
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        pad_read_ports();
+        let trig: u16 = pad_poll_trigger(0);
+        if trig & PAD_START != 0 {
+            break;
+        }
+    }
+
+    fade_screen(0, 0);
+    return 0;  // Start game
+}
+
+
+// ============================================================================
+// FUNCTION: Initialize Simple Test Walkmap
+// Creates floor at Y=200 for testing
+// ============================================================================
+
+#[mode(m8, x16)]
+fn init_test_walkmap() {
+    // Clear walkmap
+    X = 0;
+    loop {
+        walkmap[X] = 0;
+        X++;
+        if X >= 7168 {
+            break;
+        }
+    }
+
+    // Create floor at Y=200 (row 25 in 8-pixel units)
+    // Walkmap is 32 bytes wide (256 pixels / 8)
+    let row: u16 = 200;  // Y position in pixels
+    let offset: u16 = row << 5;  // row * 32
+
+    X = offset;
+    let col: u8 = 0;
+    loop {
+        walkmap[X] = T_FLOOR;
+        X++;
+        col++;
+        if col >= 32 {
+            break;
+        }
+    }
+
+    // Create a small platform in the middle
+    row = 160;
+    offset = row << 5;
+    offset = offset + 10;  // Start at column 10
+    X = offset;
+    col = 0;
+    loop {
+        walkmap[X] = T_FLOOR;
+        X++;
+        col++;
+        if col >= 12 {
+            break;
+        }
+    }
+
+    // Create a ladder at column 20
+    let y: u16 = 160;
+    loop {
+        offset = (y << 5) + 20;
+        walkmap[offset] = T_LADDER;
+        walkmap[offset + 1] = T_LADDER;
+        y++;
+        if y >= 200 {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Draw Test Level Background
+// ============================================================================
+
+#[mode(m8, x16)]
+fn draw_test_level() {
+    // Draw floor tiles at Y=200 (tile row 25)
+    let pos: u16 = POS!(0, 25);
+    X = 0;
+    loop {
+        nametable1[pos + X] = 0x144 | BG_PAL!(1);  // Floor tile
+        X++;
+        if X >= 32 {
+            break;
+        }
+    }
+
+    // Draw platform tiles at Y=160 (tile row 20)
+    pos = POS!(10, 20);
+    X = 0;
+    loop {
+        nametable1[pos + X] = 0x144 | BG_PAL!(1);
+        X++;
+        if X >= 12 {
+            break;
+        }
+    }
+
+    // Draw ladder at column 20
+    let y: u8 = 20;
+    loop {
+        pos = POS!(20, y);
+        nametable1[pos] = 0x148 | BG_PAL!(1);  // Ladder tile
+        nametable1[pos + 1] = 0x148 | BG_PAL!(1);
+        y++;
+        if y >= 25 {
+            break;
+        }
+    }
+
+    // Draw level indicator
+    put_str(&nametable1[POS!(2, 2)] as *u16, "LEVEL 1  - USE ARROWS + A/B" as far *u8);
+    put_str(&nametable1[POS!(2, 4)] as *u16, "PRESS START TO EXIT" as far *u8);
+}
+
+
+// ============================================================================
+// FUNCTION: Game Loop - Full Player Control
+// ============================================================================
+
+#[mode(m8, x8)]
+fn game_loop() -> u8 {
+    let clear: u8 = 0;
+
+    set_bright(0);
+    oam_clear();
+    clear_nametables();
+
+    // Load level graphics
+    copy_to_vram(0x1000, &font_gfx as far *u8, 2048, 0);
+    copy_to_vram(0x1400, &tileset1_gfx as far *u8, 2048, 0);
+
+    setup_ingame_graphics();
+
+    // Initialize test level
+    init_test_walkmap();
+    draw_test_level();
+
+    update_nametables();
+    setup_palettes();
+    update_palette();
+
+    // Set all sprites to 16x16
+    let i: u16 = 0;
+    loop {
+        oam_size(i, 1);
+        i = i + 4;
+        if i >= 512 {
+            break;
+        }
+    }
+
+    // Initialize player
+    player_init();
+    player_x = 32;
+    player_y = 184;  // Just above floor
+
+    // Initialize enemy system
+    enemy_init();
+
+    // Initialize item/particle system
+    items_init();
+
+    // Initialize Kong AI
+    kong_init();
+    kong_x = 36;
+    kong_y = 40;
+    princess_x = 80;
+    princess_y = 24;
+
+    // Fade in
+    let bright: u8 = 0;
+
+    // Main gameplay loop
+    loop {
+        nmi_wait();
+
+        // Fade in
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        // Read input
+        pad_read_ports();
+        let pad: u16 = pad_poll(0);
+        let trig: u16 = pad_poll_trigger(0);
+
+        // Process splat animation (hammer hit effect)
+        let splat_active: u8 = process_splat();
+
+        // Update player
+        let result: u8 = player_update(pad);
+
+        // Check for death from player system
+        if result == LEVEL_LOSE {
+            clear = LEVEL_LOSE;
+            break;
+        }
+
+        // Update enemies
+        let enemy_result: u8 = enemy_process();
+
+        // Check for death from enemy collision
+        if enemy_result == LEVEL_LOSE {
+            clear = LEVEL_LOSE;
+            break;
+        }
+
+        // Process items
+        items_draw();
+        items_check_collision();
+
+        // Process particles
+        particle_process();
+
+        // Process elevators (level 3)
+        if game_level == 2 {
+            elevators_process();
+        }
+
+        // Process Kong AI and level-specific logic
+        let kong_result: u8 = kong_process();
+        if kong_result == LEVEL_CLEAR {
+            clear = LEVEL_CLEAR;
+            break;
+        } else if kong_result == LEVEL_LOSE {
+            clear = LEVEL_LOSE;
+            break;
+        }
+
+        // Draw princess
+        game_show_princess((game_frame_cnt >> 3) as u8 & 3);
+
+        // Press START to exit level
+        if trig & PAD_START != 0 {
+            clear = LEVEL_CLEAR;
+            break;
+        }
+
+        // Press SELECT for test mode (skip level)
+        if game_test_mode != 0 {
+            if trig & PAD_SELECT != 0 {
+                clear = LEVEL_CLEAR;
+                break;
+            }
+        }
+
+        // Increment frame counter
+        game_frame_cnt++;
+    }
+
+    // Fade out
+    fade_screen(0, 0);
+
+    return clear;
+}
+
+
+// ============================================================================
+// ENTRY POINT
+// ============================================================================
+
+#[entry]
+#[bank(0)]
+#[mode(m8, x8)]
+fn main() -> ! {
+    // Initialize hardware
+    game_init();
+
+    // Clear VRAM
+    fill_vram(0, 0, 65535);
+
+    // Show company logo
+    show_logo();
+
+    // Fade out logo
+    fade_screen(0, 0);
+
+    // Re-initialize for game mode
+    game_init();
+
+    // Load shared graphics
+    copy_to_vram(0x1000, &font_gfx as far *u8, 2048, 0);
+    copy_to_vram(0x1400, &tileset1_gfx as far *u8, 2048, 0);
+
+    // Initialize sound system
+    spc_setup();
+
+    // Show PAL warning if needed
+    if is_ntsc == 0 {
+        show_pal_warning();
+    }
+
+    // Initialize game state
+    game_score = 0;
+    game_best_score = 0;
+    game_test_mode = FALSE;
+    game_hard_mode = FALSE;
+
+    global_volume = 127;
+    global_stereo = 1;
+    game_frame_cnt = 0;
+
+    // Main game loop
+    loop {
+        // Title screen
+        let skip_intro: u8 = full_title_screen();
+
+        // Initialize game variables
+        game_level = 0;
+        game_lives = 3;
+        game_score = 0;
+
+        if game_hard_mode == 0 {
+            game_loops = 0;
+        } else {
+            game_loops = 15;
+        }
+
+        // Show intro cutscene (Kong climbs with princess)
+        if skip_intro == FALSE {
+            cutscene_intro();
+        }
+
+        // Level loop
+        loop {
+            // Show level start cutscene (How high can you get?)
+            cutscene_level();
+
+            // Play the level
+            let result: u8 = game_loop();
+
+            if result == LEVEL_CLEAR {
+                // Show next level cutscene (Kong grabs princess)
+                cutscene_next_level();
+
+                // Next level
+                game_level++;
+
+                if game_level >= 4 {
+                    // All levels complete
+                    cutscene_levels_clear();
+
+                    // Reset and increase difficulty
+                    game_level = 0;
+                    if game_loops < 255 {
+                        game_loops++;
+                    }
+                }
+            } else {
+                // Lost a life
+                if game_test_mode == 0 {
+                    game_lives--;
+                }
+
+                if game_lives == 0 {
+                    // Game over
+                    if game_score > game_best_score {
+                        game_best_score = game_score;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}

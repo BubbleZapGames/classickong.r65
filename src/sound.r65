@@ -1,0 +1,339 @@
+// ============================================================================
+// Classic Kong Complete - Sound and Music Interface
+// ============================================================================
+// SPC700 communication for music and sound effects
+// ============================================================================
+
+// ============================================================================
+// APU REGISTERS (SNES Audio Processing Unit I/O Ports)
+// ============================================================================
+
+#[hw(0x2140)]
+static mut APU0: u8;
+
+#[hw(0x2141)]
+static mut APU1: u8;
+
+#[hw(0x2142)]
+static mut APU2: u8;
+
+#[hw(0x2143)]
+static mut APU3: u8;
+
+
+// ============================================================================
+// SOUND STATE VARIABLES
+// ============================================================================
+
+#[lowram]
+static mut snes_spc_sync: u8;
+
+#[lowram]
+static mut snes_spc_stereo: u8;
+
+#[lowram]
+static mut snes_spc_volume: u8;
+
+
+// ============================================================================
+// COMMAND CODES
+// ============================================================================
+
+const SCMD_STEREO: u16 = 0x0000;      // Change stereo sound mode
+const SCMD_VOLUME: u16 = 0x1000;      // Set global volume
+const SCMD_MUSIC_STOP: u16 = 0x2000;  // Stop music
+const SCMD_MUSIC_PLAY: u16 = 0x3000;  // Start music
+const SCMD_SFX_PLAY: u16 = 0x4000;    // Play sound effect
+const SCMD_RELOAD: u16 = 0x5000;      // Load new music data
+
+
+// ============================================================================
+// SOUND EFFECT IDS
+// ============================================================================
+
+const SFX_CHN: u8 = 4;  // Base channel for SFX
+
+const SFX_BARREL1: u8 = 0;
+const SFX_BARREL2: u8 = 1;
+const SFX_BARREL3: u8 = 2;
+const SFX_BARREL4: u8 = 3;
+const SFX_HERO_JUMP: u8 = 4;
+const SFX_ITEM: u8 = 5;
+const SFX_PAUSE: u8 = 6;
+const SFX_JUMP_OVER: u8 = 7;
+const SFX_FIRE_SPAWN: u8 = 8;
+const SFX_RAFT_FALL: u8 = 9;
+const SFX_KONG_LEFT: u8 = 10;
+const SFX_KONG_RIGHT: u8 = 11;
+const SFX_RIVET: u8 = 12;
+const SFX_BOUNCE_FALL: u8 = 13;
+const SFX_BOUNCE_JUMP: u8 = 14;
+const SFX_KONG_FALLS: u8 = 15;
+const SFX_KONG_LANDS: u8 = 16;
+const SFX_LOVE: u8 = 17;
+const SFX_BRIDGE: u8 = 18;
+const SFX_DESTROY: u8 = 19;
+const SFX_START: u8 = 20;
+const SFX_LADDER1: u8 = 21;
+const SFX_LADDER2: u8 = 22;
+const SFX_BARREL_ROLL: u8 = 23;
+const SFX_HERO_FALL: u8 = 24;
+const SFX_HERO_LANDS: u8 = 25;
+const SFX_HERO_HIT: u8 = 26;
+const SFX_KONG_LAUGH: u8 = 27;
+const SFX_CRACK: u8 = 28;
+const SFX_SWITCH: u8 = 29;
+const SFX_BURN: u8 = 30;
+const SFX_EXTRA_LIFE: u8 = 31;
+const SFX_HEART: u8 = 32;
+
+
+// ============================================================================
+// MUSIC TRACK IDS
+// ============================================================================
+
+const MUS_TITLE: u8 = 0;
+const MUS_GAME_START: u8 = 1;
+const MUS_STAGE_START: u8 = 2;
+const MUS_LOSE: u8 = 3;
+const MUS_STAGE_CLEAR: u8 = 4;
+const MUS_HAMMER: u8 = 5;
+const MUS_LEVEL1: u8 = 6;
+const MUS_TIME_OUT: u8 = 7;
+const MUS_VICTORY: u8 = 8;
+
+
+// ============================================================================
+// FUNCTION: Send Command to SPC700
+// ============================================================================
+
+#[mode(m8, x8)]
+fn spc_command(command @ A: u16, param: u16) {
+    // Write command with sync byte
+    let cmd: u16 = command | (snes_spc_sync as u16);
+
+    // Write low byte of command to APU0
+    APU0 = (cmd & 0xFF) as u8;
+    // Write high byte of command to APU1
+    APU1 = (cmd >> 8) as u8;
+
+    // Write parameter to APU2/APU3
+    APU2 = (param & 0xFF) as u8;
+    APU3 = (param >> 8) as u8;
+
+    // Wait for acknowledgment (unless reload command)
+    if command != SCMD_RELOAD {
+        loop {
+            if APU0 == snes_spc_sync {
+                break;
+            }
+        }
+        snes_spc_sync++;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Set Stereo Mode
+// ============================================================================
+
+#[mode(m8, x8)]
+fn spc_stereo(stereo @ A: u8) {
+    snes_spc_stereo = stereo;
+    spc_command(SCMD_STEREO, stereo as u16);
+}
+
+
+// ============================================================================
+// FUNCTION: Set Global Volume
+// ============================================================================
+
+#[mode(m8, x8)]
+fn spc_volume(volume @ A: u8) {
+    let vol: u8 = volume;
+    if vol > 127 {
+        vol = 127;
+    }
+    snes_spc_volume = vol;
+    spc_command(SCMD_VOLUME, vol as u16);
+}
+
+
+// ============================================================================
+// FUNCTION: Stop Music
+// ============================================================================
+
+#[mode(m8, x8)]
+fn music_stop() {
+    spc_command(SCMD_MUSIC_STOP, 0);
+}
+
+
+// ============================================================================
+// FUNCTION: Start Music
+// ============================================================================
+
+#[mode(m8, x8)]
+fn music_start() {
+    spc_command(SCMD_MUSIC_PLAY, 0);
+}
+
+
+// ============================================================================
+// FUNCTION: Upload Data to SPC700 Using IPL Loader
+// ============================================================================
+
+#[mode(m8, x16)]
+fn spc_load_data(adr @ X: u16, src: far *u8, size: u16) {
+    // Disable NMI during transfer
+    NMITIMEN = 0;
+
+    // Wait for APU ready (0xBBAA)
+    loop {
+        if APU0 == 0xAA && APU1 == 0xBB {
+            break;
+        }
+    }
+
+    // Set destination address
+    APU2 = (adr & 0xFF) as u8;
+    APU3 = (adr >> 8) as u8;
+
+    // Not last block
+    APU1 = 1;
+
+    // Start transfer command
+    APU0 = 0xCC;
+
+    // Wait for ready
+    loop {
+        if APU0 == 0xCC {
+            break;
+        }
+    }
+
+    let cnt: u8 = 0;
+    let remaining: u16 = size;
+    let ptr: u16 = 0;
+
+    loop {
+        if remaining == 0 {
+            break;
+        }
+
+        // Write data byte
+        APU1 = src[ptr];
+
+        // Write counter
+        APU0 = cnt;
+
+        // Wait for acknowledgment
+        loop {
+            if APU0 == cnt {
+                break;
+            }
+        }
+
+        cnt++;
+        ptr++;
+        remaining--;
+    }
+
+    // Set startup address (0x0200)
+    APU2 = 0x00;
+    APU3 = 0x02;
+
+    // Run APU code
+    APU1 = 0;
+    APU0 = cnt + 2;
+
+    snes_spc_sync = cnt;
+
+    // Re-enable NMI
+    NMITIMEN = 0x81;
+    nmi_wait();
+}
+
+
+// ============================================================================
+// FUNCTION: Initialize Sound System
+// ============================================================================
+
+#[mode(m8, x8)]
+fn spc_setup() {
+    snes_spc_stereo = 0;
+    snes_spc_volume = 127;
+
+    // Upload SPC700 driver code
+    spc_load_data(0x0200, &spc700_data as far *u8, SPC700_SIZE);
+}
+
+
+// ============================================================================
+// FUNCTION: Load Music Track
+// ============================================================================
+
+#[mode(m8, x8)]
+fn spc_load_music(data @ X: far *u8, size: u16) {
+    spc_command(SCMD_RELOAD, 0);
+    spc_load_data(0xE000, data, size);
+    spc_stereo(snes_spc_stereo);
+    spc_volume(snes_spc_volume);
+}
+
+
+// ============================================================================
+// FUNCTION: Play Sound Effect
+// ============================================================================
+
+#[mode(m8, x8)]
+fn sfx_play(chn @ A: u8, sfx: u8, pan: u8) {
+    let cmd: u16 = SCMD_SFX_PLAY | ((chn as u16) << 8);
+    let param: u16 = (sfx as u16) | ((pan as u16) << 8);
+    spc_command(cmd, param);
+}
+
+
+// ============================================================================
+// FUNCTION: Play Music Track
+// ============================================================================
+
+#[mode(m8, x8)]
+fn music_play(mus @ A: u8) {
+    let music_data: far *u8;
+    let music_size: u16;
+
+    // Select music data based on track ID
+    if mus == MUS_TITLE {
+        music_data = &music_title_data as far *u8;
+        music_size = MUSIC_TITLE_SIZE;
+    } else if mus == MUS_GAME_START {
+        music_data = &music_game_start_data as far *u8;
+        music_size = MUSIC_GAME_START_SIZE;
+    } else if mus == MUS_STAGE_START {
+        music_data = &music_stage_start_data as far *u8;
+        music_size = MUSIC_STAGE_START_SIZE;
+    } else if mus == MUS_LOSE {
+        music_data = &music_lose_data as far *u8;
+        music_size = MUSIC_LOSE_SIZE;
+    } else if mus == MUS_STAGE_CLEAR {
+        music_data = &music_stage_clear_data as far *u8;
+        music_size = MUSIC_STAGE_CLEAR_SIZE;
+    } else if mus == MUS_HAMMER {
+        music_data = &music_hammer_data as far *u8;
+        music_size = MUSIC_HAMMER_SIZE;
+    } else if mus == MUS_LEVEL1 {
+        music_data = &music_level1_data as far *u8;
+        music_size = MUSIC_LEVEL1_SIZE;
+    } else if mus == MUS_TIME_OUT {
+        music_data = &music_time_out_data as far *u8;
+        music_size = MUSIC_TIME_OUT_SIZE;
+    } else {
+        // MUS_VICTORY
+        music_data = &music_victory_data as far *u8;
+        music_size = MUSIC_VICTORY_SIZE;
+    }
+
+    spc_load_music(music_data, music_size);
+    music_start();
+}

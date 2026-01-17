@@ -1,0 +1,773 @@
+// ============================================================================
+// Classic Kong Complete - Game Framework
+// ============================================================================
+// Core game library: OAM management, joypad handling, DMA, NMI
+// ============================================================================
+
+// ============================================================================
+// RAM VARIABLES - Joypad State
+// ============================================================================
+
+#[lowram]
+static mut joypad_state: [u16; 2];
+
+#[lowram]
+static mut joypad_state_prev: [u16; 2];
+
+#[lowram]
+static mut joypad_state_trigger: [u16; 2];
+
+
+// ============================================================================
+// RAM VARIABLES - Frame Counter and Random
+// ============================================================================
+
+#[lowram]
+static mut frame_cnt: u16;
+
+#[lowram]
+static mut rand_seed1: u16;
+
+#[lowram]
+static mut rand_seed2: u16;
+
+
+// ============================================================================
+// RAM VARIABLES - System State
+// ============================================================================
+
+#[lowram]
+static mut is_ntsc: u8;
+
+#[lowram]
+static mut skip_cnt: u8;
+
+
+// ============================================================================
+// RAM BUFFERS - OAM (544 bytes)
+// ============================================================================
+
+#[lowram]
+static mut oam_buffer: [u8; 544];
+
+
+// ============================================================================
+// RAM BUFFERS - Palette (512 bytes)
+// ============================================================================
+
+#[ram]
+static mut palette_buffer: [u16; 256];
+
+#[ram]
+static mut palette_target: [u16; 256];
+
+
+// ============================================================================
+// RAM BUFFERS - Nametables (32x32 tiles x 2 bytes = 2KB each)
+// ============================================================================
+
+#[ram]
+static mut nametable1: [u16; 1024];
+
+#[ram]
+static mut nametable2: [u16; 1024];
+
+#[ram]
+static mut nametable3: [u16; 1024];
+
+
+// ============================================================================
+// RAM BUFFERS - Map and Walkmap
+// ============================================================================
+
+#[ram]
+static mut map: [u8; 1024];  // 32x32 tile map
+
+#[ram]
+static mut walkmap: [u8; 7168];  // 32x224 collision map
+
+
+// ============================================================================
+// RAM BUFFERS - Temporary graphics buffers
+// ============================================================================
+
+#[ram]
+static mut back_buffer: [u16; 12288];  // 24KB / 2 = 12288 words
+
+#[ram]
+static mut back_graphics: [u16; 3072];  // Mask graphics buffer
+
+
+// ============================================================================
+// CONSTANTS - Joypad Buttons
+// ============================================================================
+
+const PAD_B: u16 = 0x8000;
+const PAD_Y: u16 = 0x4000;
+const PAD_SELECT: u16 = 0x2000;
+const PAD_START: u16 = 0x1000;
+const PAD_UP: u16 = 0x0800;
+const PAD_DOWN: u16 = 0x0400;
+const PAD_LEFT: u16 = 0x0200;
+const PAD_RIGHT: u16 = 0x0100;
+const PAD_A: u16 = 0x0080;
+const PAD_X: u16 = 0x0040;
+const PAD_L: u16 = 0x0020;
+const PAD_R: u16 = 0x0010;
+
+
+// ============================================================================
+// CONSTANTS - Sprite/BG Attributes
+// ============================================================================
+
+// Build sprite palette attribute: (palette & 7) << 9
+macro_rules! SPR_PAL($pal:expr) { (($pal & 0x07) << 9) }
+
+// Build sprite priority attribute: priority << 12
+macro_rules! SPR_PRI($pri:expr) { (($pri & 0x03) << 12) }
+
+const SPR_HFLIP: u16 = 0x4000;
+const SPR_VFLIP: u16 = 0x8000;
+
+// Build BG palette attribute: (palette & 7) << 10
+macro_rules! BG_PAL($pal:expr) { (($pal & 0x07) << 10) }
+
+const BG_PRI: u16 = 0x2000;
+const BG_HFLIP: u16 = 0x4000;
+const BG_VFLIP: u16 = 0x8000;
+
+
+// ============================================================================
+// CONSTANTS - Color Masks
+// ============================================================================
+
+const R_MASK: u16 = 0x001F;
+const G_MASK: u16 = 0x03E0;
+const B_MASK: u16 = 0x7C00;
+
+
+// ============================================================================
+// CONSTANTS - Boolean
+// ============================================================================
+
+const FALSE: u8 = 0;
+const TRUE: u8 = 1;
+
+
+// ============================================================================
+// FUNCTION: 16-bit Random Number Generator
+// ============================================================================
+
+#[mode(m16, x16)]
+fn rand() -> u16 {
+    A = rand_seed2;
+    A = A >> 1;
+    A = A + rand_seed1;
+    rand_seed1 = A;
+
+    let temp @ A: u16 = rand_seed1;
+    temp = temp ^ 15;
+    A = rand_seed2 - temp;
+    rand_seed2 = A;
+
+    return rand_seed1;
+}
+
+
+// ============================================================================
+// FUNCTION: NMI Handler - Updates OAM every frame
+// ============================================================================
+
+#[interrupt(nmi)]
+#[mode(m8, x8)]
+fn nmi_handler() {
+    // DMA OAM buffer to PPU (channel 7)
+    OAMADDL = 0;
+    OAMADDH = 0;
+
+    // Set DMA parameters for channel 7
+    DMAP7 = 0x00;  // 1 register, write once, increment
+    BBAD7 = 0x04;  // $2104 = OAMDATA
+
+    // Set source address (oam_buffer)
+    A1T7L = &oam_buffer as u8;
+    A1T7H = (&oam_buffer >> 8) as u8;
+    A1B7 = 0x7E;  // Bank $7E (WRAM)
+
+    // Set size: 544 bytes ($0220)
+    DAS7L = 0x20;
+    DAS7H = 0x02;
+
+    // Trigger DMA
+    MDMAEN = 0x80;  // Channel 7
+
+    // Increment frame counter
+    frame_cnt++;
+}
+
+
+// ============================================================================
+// FUNCTION: Wait for Next Frame (NMI)
+// ============================================================================
+
+#[mode(m16, x8)]
+fn nmi_wait() {
+    let prev @ A: u16 = frame_cnt;
+
+    loop {
+        if frame_cnt != prev {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Poll Joypad Ports
+// ============================================================================
+
+#[mode(m16, x8)]
+fn pad_read_ports() {
+    // Wait for joypad read to complete
+    loop {
+        A = HVBJOY as u16;
+        if A & 0x01 == 0 {
+            break;
+        }
+    }
+
+    // Read joypad 1
+    A = (JOY1H as u16) << 8;
+    A = A | (JOY1L as u16);
+
+    let current @ A: u16 = A;
+    let prev: u16 = joypad_state_prev[0];
+
+    joypad_state[0] = current;
+
+    // Calculate trigger (new presses)
+    A = current ^ prev;
+    A = A & current;
+    joypad_state_trigger[0] = A;
+
+    joypad_state_prev[0] = current;
+
+    // Read joypad 2
+    A = (JOY2H as u16) << 8;
+    A = A | (JOY2L as u16);
+
+    let current2 @ A: u16 = A;
+    let prev2: u16 = joypad_state_prev[1];
+
+    joypad_state[1] = current2;
+
+    A = current2 ^ prev2;
+    A = A & current2;
+    joypad_state_trigger[1] = A;
+
+    joypad_state_prev[1] = current2;
+}
+
+
+// ============================================================================
+// FUNCTION: Get Joypad State
+// ============================================================================
+
+#[mode(m16, x8)]
+fn pad_poll(joy @ X: u8) -> u16 {
+    return joypad_state[X];
+}
+
+
+// ============================================================================
+// FUNCTION: Get Joypad Trigger State
+// ============================================================================
+
+#[mode(m16, x8)]
+fn pad_poll_trigger(joy @ X: u8) -> u16 {
+    return joypad_state_trigger[X];
+}
+
+
+// ============================================================================
+// FUNCTION: Set Palette Entries
+// ============================================================================
+
+#[mode(m16, x16)]
+fn set_palette(start @ X: u16, count @ Y: u16, src: far *u16) {
+    loop {
+        A = *src;
+        palette_buffer[X] = A;
+        src++;
+        X++;
+        Y--;
+        if Y == 0 {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Set Single Palette Color
+// ============================================================================
+
+#[mode(m16, x16)]
+fn set_color(index @ X: u16, color @ A: u16) {
+    palette_buffer[X] = color;
+}
+
+
+// ============================================================================
+// FUNCTION: Update Palette to VRAM via DMA
+// ============================================================================
+
+#[mode(m8, x8)]
+fn update_palette() {
+    // DMA palette buffer to CGRAM (channel 7)
+    CGADD = 0;  // Start at color 0
+
+    DMAP7 = 0x02;  // 1 register, write twice (low/high)
+    BBAD7 = 0x22;  // $2122 = CGDATA
+
+    A1T7L = &palette_buffer as u8;
+    A1T7H = (&palette_buffer >> 8) as u8;
+    A1B7 = 0x7E;
+
+    DAS7L = 0x00;  // 512 bytes ($0200)
+    DAS7H = 0x02;
+
+    MDMAEN = 0x80;
+}
+
+
+// ============================================================================
+// FUNCTION: Copy Data to VRAM via DMA
+// ============================================================================
+
+#[mode(m8, x8)]
+fn copy_to_vram(vram_addr @ X: u16, src: far *u8, size @ Y: u16, bank @ A: u8) {
+    // Set VRAM address
+    VMADDL = X as u8;
+    VMADDH = (X >> 8) as u8;
+    VMAIN = 0x80;  // Increment after high byte
+
+    // DMA setup
+    DMAP7 = 0x01;  // 2 registers (L, H)
+    BBAD7 = 0x18;  // $2118 = VMDATAL
+
+    A1T7L = src as u8;
+    A1T7H = (src >> 8) as u8;
+    A1B7 = bank;
+
+    DAS7L = Y as u8;
+    DAS7H = (Y >> 8) as u8;
+
+    MDMAEN = 0x80;
+}
+
+
+// ============================================================================
+// FUNCTION: Fill VRAM with Value via DMA
+// ============================================================================
+
+#[zeropage]
+static mut fill_value: u8;
+
+#[mode(m8, x8)]
+fn fill_vram(vram_addr @ X: u16, value @ A: u8, size @ Y: u16) {
+    fill_value = value;
+
+    VMADDL = X as u8;
+    VMADDH = (X >> 8) as u8;
+    VMAIN = 0x80;
+
+    DMAP7 = 0x09;  // 2 registers, fixed source
+    BBAD7 = 0x18;
+
+    A1T7L = &fill_value as u8;
+    A1T7H = (&fill_value >> 8) as u8;
+    A1B7 = 0x00;  // Direct page bank
+
+    DAS7L = Y as u8;
+    DAS7H = (Y >> 8) as u8;
+
+    MDMAEN = 0x80;
+}
+
+
+// ============================================================================
+// FUNCTION: Set OAM Sprite Entry (full X support, slower)
+// ============================================================================
+
+#[mode(m8, x16)]
+fn oam_spr(x @ A: u16, y: u8, chr: u16, off @ X: u16) {
+    oam_buffer[X] = x as u8;
+    oam_buffer[X + 1] = y;
+    oam_buffer[X + 2] = chr as u8;
+    oam_buffer[X + 3] = (chr >> 8) as u8;
+
+    // Handle X high bit in extended OAM
+    let ext_off: u16 = 512 + (off >> 4);
+    let bit_pos: u8 = (off & 0x0C) >> 1;
+
+    let ext_val: u8 = oam_buffer[ext_off];
+    let x_high: u8 = ((x >> 8) & 0x01) as u8;
+
+    // Clear and set the appropriate bit
+    A = 0x01;
+    A = A << bit_pos;
+    let mask @ A: u8 = ~A;
+    ext_val = ext_val & mask;
+
+    A = x_high << bit_pos;
+    ext_val = ext_val | A;
+
+    oam_buffer[ext_off] = ext_val;
+}
+
+
+// ============================================================================
+// FUNCTION: Set OAM Sprite Entry (fast, X low byte only)
+// ============================================================================
+
+#[mode(m8, x16)]
+fn oam_spr1(x @ A: u8, y: u8, chr: u16, off @ X: u16) {
+    oam_buffer[X] = x;
+    oam_buffer[X + 1] = y;
+    oam_buffer[X + 2] = chr as u8;
+    oam_buffer[X + 3] = (chr >> 8) as u8;
+}
+
+
+// ============================================================================
+// FUNCTION: Set OAM Sprite Size Bit
+// ============================================================================
+
+#[mode(m8, x16)]
+fn oam_size(off @ X: u16, size @ A: u8) {
+    let ext_off: u16 = 512 + (off >> 4);
+    let bit_pos: u8 = ((off >> 2) & 3) as u8;
+    bit_pos = bit_pos * 2 + 1;  // Size bit is the odd bit
+
+    let ext_val: u8 = oam_buffer[ext_off];
+
+    if size != 0 {
+        // Set the size bit
+        A = 0x01;
+        A = A << bit_pos;
+        ext_val = ext_val | A;
+    } else {
+        // Clear the size bit
+        A = 0x01;
+        A = A << bit_pos;
+        A = ~A;
+        ext_val = ext_val & A;
+    }
+
+    oam_buffer[ext_off] = ext_val;
+}
+
+
+// ============================================================================
+// FUNCTION: Clear OAM Buffer (all sprites off-screen)
+// ============================================================================
+
+#[mode(m8, x16)]
+fn oam_clear() {
+    X = 0;
+
+    loop {
+        oam_buffer[X] = 0;      // X
+        oam_buffer[X + 1] = 240; // Y (off-screen)
+        oam_buffer[X + 2] = 0;   // Tile
+        oam_buffer[X + 3] = 0;   // Attr
+
+        X = X + 4;
+        if X >= 512 {
+            break;
+        }
+    }
+
+    // Clear extended OAM (X high bits and size bits)
+    loop {
+        oam_buffer[X] = 0;
+        X++;
+        if X >= 544 {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Delay for N Frames
+// ============================================================================
+
+#[mode(m16, x8)]
+fn delay(frames @ X: u16) {
+    loop {
+        nmi_wait();
+        X--;
+        if X == 0 {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Set Screen Brightness
+// ============================================================================
+
+#[mode(m8, x8)]
+fn set_bright(level @ A: u8) {
+    if A == 0 {
+        A = 0x80;  // Force blank
+    }
+    INIDISP = A;
+}
+
+
+// ============================================================================
+// FUNCTION: Set Scroll for Layer
+// ============================================================================
+
+#[mode(m8, x8)]
+fn set_scroll_layer(layer @ A: u8, x: u16, y: u16) {
+    if A == 0 {
+        BG1HOFS = x as u8;
+        BG1HOFS = (x >> 8) as u8;
+        BG1VOFS = y as u8;
+        BG1VOFS = (y >> 8) as u8;
+    } else if A == 1 {
+        BG2HOFS = x as u8;
+        BG2HOFS = (x >> 8) as u8;
+        BG2VOFS = y as u8;
+        BG2VOFS = (y >> 8) as u8;
+    } else if A == 2 {
+        BG3HOFS = x as u8;
+        BG3HOFS = (x >> 8) as u8;
+        BG3VOFS = y as u8;
+        BG3VOFS = (y >> 8) as u8;
+    } else {
+        BG4HOFS = x as u8;
+        BG4HOFS = (x >> 8) as u8;
+        BG4VOFS = y as u8;
+        BG4VOFS = (y >> 8) as u8;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Set Pixelization Effect
+// ============================================================================
+
+#[mode(m8, x8)]
+fn set_pixelize(level @ A: u8) {
+    if A != 0 {
+        A = 16 - A;
+        A = A << 4;
+        A = A | 0x0F;
+    }
+    MOSAIC = A;
+}
+
+
+// ============================================================================
+// FUNCTION: Initialize Game System
+// ============================================================================
+
+#[mode(m8, x8)]
+fn game_init() {
+    // Initialize variables
+    frame_cnt = 0;
+    rand_seed1 = 1;
+    rand_seed2 = 5;
+    skip_cnt = 0;
+
+    // Check NTSC/PAL
+    A = STAT78;
+    if A & 0x10 != 0 {
+        is_ntsc = 0;  // PAL
+    } else {
+        is_ntsc = 1;  // NTSC
+    }
+
+    // Initialize joypad state
+    joypad_state[0] = 0;
+    joypad_state[1] = 0;
+    joypad_state_prev[0] = 0;
+    joypad_state_prev[1] = 0;
+    joypad_state_trigger[0] = 0;
+    joypad_state_trigger[1] = 0;
+
+    // PPU setup
+    // Mode 2 + BG3 priority
+    BGMODE = 0x0A;  // Mode 2, 2 layers
+
+    // Nametable addresses
+    BG1SC = 0 << 2;   // $0000
+    BG2SC = 1 << 2;   // $0400
+    BG3SC = 31 << 2;  // $7C00
+
+    // Character base addresses
+    BG12NBA = 0x40;  // BG1 at $0000, BG2 at $4000
+    BG34NBA = 0x44;  // BG3 and 4 at $4000
+
+    // Enable sprites and backgrounds
+    TM = 0x13;  // OBJ + BG1 + BG2
+
+    // Sprite settings: 8x8 and 16x16, graphics at $2000
+    OBSEL = 1;
+
+    // FastROM enable
+    MEMSEL = 1;
+
+    // Color math setup
+    CGWSEL = 0x00;
+    CGADSUB = 0x82;
+
+    // Reset scroll
+    X = 0;
+    loop {
+        set_scroll_layer(X, 0, 0);
+        X++;
+        if X >= 4 {
+            break;
+        }
+    }
+
+    // Clear display
+    set_bright(0);
+    oam_clear();
+
+    // Enable NMI and joypad
+    NMITIMEN = 0x81;
+}
+
+
+// ============================================================================
+// FUNCTION: Clear All Nametables
+// ============================================================================
+
+#[mode(m16, x16)]
+fn clear_nametables() {
+    X = 0;
+    A = 0x0100;  // Empty tile
+
+    loop {
+        nametable1[X] = A;
+        nametable2[X] = A;
+        nametable3[X] = 0;
+        X++;
+        if X >= 1024 {
+            break;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Upload Nametables to VRAM
+// ============================================================================
+
+#[mode(m8, x8)]
+fn update_nametables() {
+    copy_to_vram(0x0000, &nametable1 as far *u8, 2048, 0x7E);
+    copy_to_vram(0x0400, &nametable2 as far *u8, 2048, 0x7E);
+    copy_to_vram(0x7C00, &nametable3 as far *u8, 2048, 0x7E);
+}
+
+
+// ============================================================================
+// FUNCTION: RLE Decompression
+// ============================================================================
+
+#[mode(m8, x16)]
+fn unrle(dst: *u8, src: far *u8) {
+    let tag: u8 = *src;
+    src++;
+
+    let last_byte: u8 = 0;
+
+    loop {
+        let byte @ A: u8 = *src;
+        src++;
+
+        if byte == tag {
+            // Run length
+            let count @ A: u8 = *src;
+            src++;
+
+            if count == 0 {
+                // End marker
+                break;
+            }
+
+            loop {
+                *dst = last_byte;
+                dst++;
+                count--;
+                if count == 0 {
+                    break;
+                }
+            }
+        } else {
+            // Literal byte
+            last_byte = byte;
+            *dst = byte;
+            dst++;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Put Text String into Nametable
+// ============================================================================
+
+const TEXT_ATR: u16 = 0x0100;  // BG_PAL(0) | BG_PRI
+
+#[mode(m8, x16)]
+fn put_str(dst: *u16, str: far *u8) {
+    loop {
+        let ch @ A: u8 = *str;
+        str++;
+
+        if ch == 0 {
+            break;
+        }
+
+        // Convert ASCII to tile number
+        let tile: u16 = (ch as u16) - 32;
+        tile = tile | TEXT_ATR;
+
+        *dst = tile;
+        dst++;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Put Number into Nametable
+// ============================================================================
+
+#[mode(m16, x16)]
+fn put_num(dst: *u16, num @ A: u16, len: u8) {
+    // This is a simplified version - full implementation needs division
+    // For now, just output the low digit
+    let digit: u16 = num % 10;
+    digit = digit + (('0' as u16) - 32) + TEXT_ATR;
+
+    // Position at rightmost digit
+    dst = dst + (len as u16) - 1;
+    *dst = digit;
+}
+
+
+// ============================================================================
+// FUNCTION: Calculate Nametable Position
+// ============================================================================
+
+macro_rules! POS($x:expr, $y:expr) { (($y << 5) + $x) }
