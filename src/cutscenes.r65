@@ -59,7 +59,6 @@ static platform_anim: [u16; 14] = [
 // FUNCTION: Display Press Start Message
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn title_screen_press_start_str(show @ A: u8) {
     if show != 0 {
         put_str(&nametable1[POS!(10, 22)] as *u16, &str_press_start as far *u8);
@@ -73,7 +72,6 @@ far fn title_screen_press_start_str(show @ A: u8) {
 // FUNCTION: Fill Rectangle in Nametable with Tiles
 // ============================================================================
 
-#[mode(m8, x16, transition=inline)]
 far fn title_set_rect(off @ X: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
     let row: u8 = 0;
     let current_tile: u16 = tile;
@@ -103,7 +101,6 @@ far fn title_set_rect(off @ X: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
 // FUNCTION: Put Number (decimal)
 // ============================================================================
 
-#[mode(m8, x16, transition=inline)]
 far fn put_num(dest @ X: *u16, value: u16, digits: u8) {
     let d: u8 = digits;
     let v: u16 = value;
@@ -128,7 +125,6 @@ far fn put_num(dest @ X: *u16, value: u16, digits: u8) {
 // Returns 1 if A+B held (skip intro)
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn full_title_screen() -> u8 {
     set_bright(0);
     oam_clear();
@@ -297,7 +293,6 @@ static mut stack_jump: [u8; 4];
 #[lowram]
 static mut stack_delay: [u8; 4];
 
-#[mode(m16, x16, transition=inline)]
 far fn cutscene_level() {
     set_bright(0);
     oam_clear();
@@ -436,7 +431,6 @@ far fn cutscene_level() {
 // FUNCTION: Intro Cutscene (Kong climbs with princess)
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn cutscene_intro() {
     game_flip = 0;
 
@@ -633,7 +627,6 @@ far fn cutscene_intro() {
 // FUNCTION: Level Clear Cutscene (Simplified)
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn cutscene_levels_clear() {
     game_flip = 0;
 
@@ -784,7 +777,6 @@ far fn cutscene_levels_clear() {
 // FUNCTION: Next Level Cutscene (Kong grabs princess)
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn cutscene_next_level() {
     // Show heart
     // TODO: sfx_play(SFX_CHN, SFX_HEART, player_x);

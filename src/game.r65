@@ -154,7 +154,6 @@ const BG_PRI: u16 = 0x2000;  // Local alias for BG_PRIORITY
 // FUNCTION: 16-bit Random Number Generator
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn rand() -> u16 {
     A = rand_seed2;
     A = A >> 1;
@@ -175,7 +174,6 @@ far fn rand() -> u16 {
 // ============================================================================
 
 #[interrupt(nmi)]
-#[mode(m16, x16, transition=inline)]
 far fn nmi_handler() {
     // DMA OAM buffer to PPU (channel 7)
     OAMADDL = 0;
@@ -206,7 +204,6 @@ far fn nmi_handler() {
 // FUNCTION: Wait for Next Frame (NMI)
 // ============================================================================
 
-#[mode(m16, x8, transition=inline)]
 far fn nmi_wait() {
     let prev @ A: u16 = frame_cnt;
 
@@ -222,7 +219,6 @@ far fn nmi_wait() {
 // FUNCTION: Poll Joypad Ports
 // ============================================================================
 
-#[mode(m16, x8, transition=inline)]
 far fn pad_read_ports() {
     // Wait for joypad read to complete
     loop {
@@ -269,8 +265,7 @@ far fn pad_read_ports() {
 // FUNCTION: Get Joypad State
 // ============================================================================
 
-#[mode(m16, x8, transition=inline)]
-far fn pad_poll(joy @ X: u8) -> u16 {
+far fn pad_poll(joy @ X: u16) -> u16 {
     return joypad_state[X];
 }
 
@@ -279,8 +274,7 @@ far fn pad_poll(joy @ X: u8) -> u16 {
 // FUNCTION: Get Joypad Trigger State
 // ============================================================================
 
-#[mode(m16, x8, transition=inline)]
-far fn pad_poll_trigger(joy @ X: u8) -> u16 {
+far fn pad_poll_trigger(joy @ X: u16) -> u16 {
     return joypad_state_trigger[X];
 }
 
@@ -300,13 +294,11 @@ static mut pal_src_addr: u16;
 static mut pal_src_bank: u8;
 
 // Helper function to set palette source address
-#[mode(m8, x16, transition=inline)]
 far fn set_pal_src(addr @ X: u16, bank @ A: u8) {
     pal_src_addr = addr;
     pal_src_bank = bank;
 }
 
-#[mode(m16, x16, transition=inline)]
 far fn set_palette(start @ X: u16, count @ Y: u16) {
     // Copy palette data - pure assembly for reliability
     // X = start color index, Y = color count
@@ -336,7 +328,6 @@ far fn set_palette(start @ X: u16, count @ Y: u16) {
 // FUNCTION: Set Single Palette Color
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn set_color(index @ X: u16, color @ A: u16) {
     palette_buffer[X] = color;
 }
@@ -349,7 +340,6 @@ far fn set_color(index @ X: u16, color @ A: u16) {
 // Palette buffer address (auto-allocated by compiler at $7E2000)
 const PALETTE_BUFFER_ADDR: u16 = 0x2000;
 
-#[mode(m16, x16, transition=inline)]
 far fn update_palette() {
     // DMA palette buffer to CGRAM (channel 7)
     CGADD = 0;  // Start at color 0
@@ -390,7 +380,6 @@ static mut dma_src_addr: u16;
 #[zeropage]
 static mut dma_src_bank: u8;
 
-#[mode(m8, x16, transition=inline)]
 far fn copy_to_vram(vram_addr @ X: u16, size @ Y: u16) {
     // Set VRAM address - use 16-bit store since VMADDL/VMADDH are contiguous
     asm!("STX $2116");  // 16-bit store to VMADDL ($2116) + VMADDH ($2117)
@@ -413,7 +402,6 @@ far fn copy_to_vram(vram_addr @ X: u16, size @ Y: u16) {
 }
 
 // Helper function to set DMA source address
-#[mode(m8, x16, transition=inline)]
 far fn set_dma_src(addr @ X: u16, bank @ A: u8) {
     dma_src_addr = addr;
     dma_src_bank = bank;
@@ -433,7 +421,6 @@ const RAM_BANK: u8 = 0x7E;     // Main SNES RAM ($7E0000-$7FFFFF)
 #[zeropage]
 static mut fill_value: u8;
 
-#[mode(m8, x16, transition=inline)]
 far fn fill_vram(vram_addr @ X: u16, value @ A: u8, size @ Y: u16) {
     fill_value = value;
 
@@ -459,7 +446,6 @@ far fn fill_vram(vram_addr @ X: u16, value @ A: u8, size @ Y: u16) {
 // FUNCTION: Set OAM Sprite Entry (full X support, slower)
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn oam_spr(x_pos: u16, y: u8, chr: u16, off @ X: u16) {
     oam_buffer[X] = x_pos as u8;
     oam_buffer[X + 1] = y;
@@ -491,7 +477,6 @@ far fn oam_spr(x_pos: u16, y: u8, chr: u16, off @ X: u16) {
 // FUNCTION: Set OAM Sprite Entry (fast, X low byte only)
 // ============================================================================
 
-#[mode(m8, x16, transition=inline)]
 far fn oam_spr1(x @ A: u8, y: u8, chr: u16, off @ X: u16) {
     oam_buffer[X] = x;
     oam_buffer[X + 1] = y;
@@ -504,7 +489,6 @@ far fn oam_spr1(x @ A: u8, y: u8, chr: u16, off @ X: u16) {
 // FUNCTION: Set OAM Sprite Size Bit
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn oam_size(off @ X: u16, size @ A: u8) {
     let ext_off: u16 = 512 + (off >> 4);
     let bit_pos: u8 = (((off >> 2) & 3) * 2 + 1) as u8;  // Size bit is the odd bit (1,3,5,7)
@@ -528,7 +512,6 @@ far fn oam_size(off @ X: u16, size @ A: u8) {
 // FUNCTION: Clear OAM Buffer (all sprites off-screen)
 // ============================================================================
 
-#[mode(m8, x16, transition=inline)]
 far fn oam_clear() {
     X = 0;
 
@@ -566,7 +549,6 @@ far fn oam_clear() {
 // FUNCTION: Set Screen Brightness
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn set_bright(level @ A: u8) {
     if A == 0 {
         A = 0x80;  // Force blank
@@ -579,7 +561,6 @@ far fn set_bright(level @ A: u8) {
 // FUNCTION: Set Scroll for Layer
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn set_scroll_layer(layer @ A: u8, x: u16, y: u16) {
     if A == 0 {
         BG1HOFS = x as u8;
@@ -611,7 +592,6 @@ far fn set_scroll_layer(layer @ A: u8, x: u16, y: u16) {
 // FUNCTION: Initialize Game System
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn game_init() {
     // Initialize variables
     frame_cnt = 0;
@@ -684,7 +664,6 @@ far fn game_init() {
 // FUNCTION: Clear All Nametables
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn clear_nametables() {
     X = 0;
     A = 0x0100;  // Empty tile
@@ -710,7 +689,6 @@ const NAMETABLE1_ADDR: u16 = 0x2400;
 const NAMETABLE2_ADDR: u16 = 0x2C00;
 const NAMETABLE3_ADDR: u16 = 0x3400;
 
-#[mode(m8, x16, transition=inline)]
 far fn update_nametables() {
     // Use hardcoded addresses to avoid compiler address-of bug
     set_dma_src(NAMETABLE1_ADDR, RAM_BANK);
@@ -726,7 +704,6 @@ far fn update_nametables() {
 // FUNCTION: RLE Decompression
 // ============================================================================
 
-#[mode(m8, x16, transition=inline)]
 far fn unrle(dst: *u8, src: far *u8) {
     let tag: u8 = *src;
     src++;
@@ -771,7 +748,6 @@ far fn unrle(dst: *u8, src: far *u8) {
 
 const TEXT_ATR: u16 = 0x0100;  // BG_PAL(0) | BG_PRI
 
-#[mode(m8, x16, transition=inline)]
 far fn put_str(dst: *u16, str: far *u8) {
     loop {
         let ch @ A: u8 = *str;
@@ -795,7 +771,6 @@ far fn put_str(dst: *u16, str: far *u8) {
 // FUNCTION: Put Number into Nametable
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn put_num_u16(dst: *u16, num @ A: u16, len: u8) {
     // This is a simplified version - full implementation needs division
     // For now, just output the low digit

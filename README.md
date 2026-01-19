@@ -53,8 +53,7 @@ wlalink linkfile.txt build/game.smc
 ### Quick Syntax Examples
 
 ```rust
-// Function with mode annotation
-#[mode(m8, x16)]
+// Function with register parameter (mode auto-inferred from param type)
 fn set_background_color(color @ A: u8) {
     CGDATA = color;
 }

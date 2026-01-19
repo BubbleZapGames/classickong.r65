@@ -282,7 +282,6 @@ static kong_anim_both: [u8; 6] = [
 // FUNCTION: Draw Kong at Position
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn game_show_kong(oam_off @ X: u16, kx: u8, ky: i16) {
     let anim_idx: u8 = kong_frame_idx;
     let frame: far *u16;
@@ -351,7 +350,6 @@ far fn game_show_kong(oam_off @ X: u16, kx: u8, ky: i16) {
 // FUNCTION: Draw Princess at Position
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn game_show_princess(frame @ A: u8) {
     let tile: u16 = PRINCESS_TILE | PRINCESS_ATR;
 
@@ -375,7 +373,6 @@ far fn game_show_princess(frame @ A: u8) {
 // Left-right swaying motion
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn kong_stand_animation_level1() {
     kong_frame_idx = kong_anim_leftright[kong_frame_cnt];
 
@@ -399,7 +396,6 @@ far fn kong_stand_animation_level1() {
 // Both arms pumping motion
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn kong_stand_animation_level2() {
     kong_frame_idx = kong_anim_both[kong_frame_cnt];
 
@@ -428,7 +424,6 @@ far fn kong_stand_animation_level2() {
 // FUNCTION: Initialize Kong for Level Start
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn kong_init() {
     kong_frame_cnt = 0;
     kong_state = KONG_STATE_STAND;
@@ -448,7 +443,6 @@ far fn kong_init() {
 // FUNCTION: Level 1 Kong Logic - Barrel Throwing
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn kong_process_level1() -> u8 {
     let clear: u8 = 0;
 
@@ -621,7 +615,6 @@ far fn kong_process_level1() -> u8 {
 // FUNCTION: Level 2 Kong Logic - Conveyor Belts
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn kong_process_level2() -> u8 {
     let clear: u8 = 0;
 
@@ -694,7 +687,6 @@ far fn kong_process_level2() -> u8 {
 // FUNCTION: Level 3 Kong Logic - Elevators and Bounces
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn kong_process_level3() -> u8 {
     let clear: u8 = 0;
 
@@ -747,7 +739,6 @@ far fn kong_process_level3() -> u8 {
 // FUNCTION: Level 4 Kong Logic - Rivets
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn kong_process_level4() -> u8 {
     let clear: u8 = 0;
 
@@ -803,7 +794,6 @@ far fn kong_process_level4() -> u8 {
 // FUNCTION: Process Kong Based on Current Level
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn kong_process() -> u8 {
     if game_level == 0 {
         return kong_process_level1();

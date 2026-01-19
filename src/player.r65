@@ -208,8 +208,7 @@ macro_rules! NAM_OFF($x:expr, $y:expr) { ((($y as u16) >> 3) << 5) + (($x as u16
 // FUNCTION: Test Walkmap at Pixel Position
 // ============================================================================
 
-#[mode(m8, x16, transition=inline)]
-far fn test_map(x @ A: u8, y @ X: u8) -> u8 {
+far fn test_map(x @ A: u8, y @ X: u16) -> u8 {
     let offset: u16 = WMAP_OFF!(x, X);
     return walkmap[offset];
 }
@@ -219,7 +218,6 @@ far fn test_map(x @ A: u8, y @ X: u8) -> u8 {
 // FUNCTION: Initialize Player
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_init() {
     player_x = 32;
     player_y = 192;
@@ -251,7 +249,6 @@ far fn player_init() {
 // Returns 0 if should skip this frame, non-zero if should move
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_horz_div(n @ A: u8) -> u8 {
     player_speed_div++;
 
@@ -268,7 +265,6 @@ far fn player_horz_div(n @ A: u8) -> u8 {
 // Returns 1 if should move, 0 if should skip
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_ladder_div() -> u8 {
     player_speed_div++;
 
@@ -288,7 +284,6 @@ far fn player_ladder_div() -> u8 {
 // FUNCTION: Get Left Clip Boundary
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_clip_left() -> u8 {
     // Near Kong platform on levels 0-2, if not flipped
     if game_level < 3 {
@@ -306,7 +301,6 @@ far fn player_clip_left() -> u8 {
 // FUNCTION: Get Right Clip Boundary
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_clip_right() -> u8 {
     // Near Kong platform on levels 0-2, if flipped
     if game_level < 3 {
@@ -324,7 +318,6 @@ far fn player_clip_right() -> u8 {
 // FUNCTION: Process Player Movement (Ground/Walking)
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_process_ground(pad @ A: u16) {
     let floor1: u8;
     let floor2: u8;
@@ -368,7 +361,6 @@ far fn player_process_ground(pad @ A: u16) {
 // FUNCTION: Check and Start Climbing Ladder
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_check_ladder(pad @ A: u16) {
     let floor1: u8;
     let floor2: u8;
@@ -412,7 +404,6 @@ far fn player_check_ladder(pad @ A: u16) {
 // FUNCTION: Process Ladder Climbing
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_process_ladder(pad @ A: u16) {
     let floor1: u8;
     let x: u8 = player_x + 7;
@@ -484,7 +475,6 @@ far fn player_process_ladder(pad @ A: u16) {
 // Returns collision flags (T_SOLID bits)
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_check_floor() -> u8 {
     let left: u8 = test_map(player_x + 8 - PLR_BBOX_HWDT, player_y + 16);
     let right: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16);
@@ -497,7 +487,6 @@ far fn player_check_floor() -> u8 {
 // Returns LEVEL_LOSE if fell too far, 0 otherwise
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_process_fall() -> u8 {
     let floor1: u8 = player_check_floor();
 
@@ -539,7 +528,6 @@ far fn player_process_fall() -> u8 {
 // FUNCTION: Push Player Out of Solid Floor (for slopes/elevators)
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_push_out_of_floor() {
     let y: u8 = player_y + 15;
     let left: u8;
@@ -563,7 +551,6 @@ far fn player_push_out_of_floor() {
 // FUNCTION: Process Jump
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_process_jump(pad @ A: u16) {
     let dy: i8;
     let floor1: u8;
@@ -644,7 +631,6 @@ far fn player_process_jump(pad @ A: u16) {
 // FUNCTION: Process Airborne Movement (while jumping or falling)
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_process_airborne() {
     // Play fall sound after a few frames
     if player_jump != JUMP_AIR {
@@ -690,7 +676,6 @@ far fn player_process_airborne() {
 // FUNCTION: Process Hammer
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_process_hammer() {
     if player_hammer_time == 0 {
         // Hide hammer sprites
@@ -738,7 +723,6 @@ far fn player_process_hammer() {
 // FUNCTION: Update Player Sprite in OAM
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_update_oam() {
     oam_spr1(player_x, player_y - 1, player_anim, OAM_PLAYER);
 }
@@ -749,7 +733,6 @@ far fn player_update_oam() {
 // Returns: 0 = OK, LEVEL_LOSE = player died
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_update(pad @ A: u16) -> u8 {
     let result: u8 = 0;
 
@@ -812,7 +795,6 @@ far fn player_update(pad @ A: u16) -> u8 {
 // FUNCTION: Play Player Death Animation
 // ============================================================================
 
-#[mode(m16, x16, transition=inline)]
 far fn player_death_animation() {
     let frame: u8 = 0;
     let counter: u8 = 0;
