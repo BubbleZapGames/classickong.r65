@@ -127,7 +127,7 @@ static item_sprite_table: [u16; 5] = [
 // FUNCTION: Clear Particle
 // ============================================================================
 
-far fn particle_clear(id @ A: u8) {
+far fn particle_clear(id: u8) {
     particle_type[id] = PART_TYPE_NONE;
     oam_spr1(0, 240, 0, OAM_PARTICLES + ((id as u16) << 2));
     particle_free = id;
@@ -155,7 +155,7 @@ far fn particles_clear() {
 // FUNCTION: Add Particle
 // ============================================================================
 
-far fn particle_add(ptype @ A: u8, px: u8, py: u8) {
+far fn particle_add(ptype: u8, px: u8, py: u8) {
     let i: u8 = particle_free;
     let j: u8 = 0;
     let cnt1: u8 = 0;
@@ -353,7 +353,7 @@ far fn items_clear() {
 // FUNCTION: Add Item
 // ============================================================================
 
-far fn game_item_add(x @ A: u8, y: u8, itype: u8) {
+far fn game_item_add(x: u8, y: u8, itype: u8) {
     if items_all >= ITEMS_MAX {
         return;
     }
@@ -499,7 +499,7 @@ far fn elevators_clear() {
 // FUNCTION: Add Elevator
 // ============================================================================
 
-far fn elevator_add(x @ A: u8, y: u8, dy: i8) {
+far fn elevator_add(x: u8, y: u8, dy: i8) {
     if elevators_all >= ELEVATORS_MAX {
         return;
     }

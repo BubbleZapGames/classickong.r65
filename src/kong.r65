@@ -282,7 +282,7 @@ static kong_anim_both: [u8; 6] = [
 // FUNCTION: Draw Kong at Position
 // ============================================================================
 
-far fn game_show_kong(oam_off @ X: u16, kx: u8, ky: i16) {
+far fn game_show_kong(oam_off: u16, kx: u8, ky: i16) {
     let anim_idx: u8 = kong_frame_idx;
     let frame: far *u16;
 
@@ -350,7 +350,7 @@ far fn game_show_kong(oam_off @ X: u16, kx: u8, ky: i16) {
 // FUNCTION: Draw Princess at Position
 // ============================================================================
 
-far fn game_show_princess(frame @ A: u8) {
+far fn game_show_princess(frame: u8) {
     let tile: u16 = PRINCESS_TILE | PRINCESS_ATR;
 
     if frame == 0 {

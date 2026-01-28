@@ -208,7 +208,7 @@ macro_rules! NAM_OFF($x:expr, $y:expr) { ((($y as u16) >> 3) << 5) + (($x as u16
 // FUNCTION: Test Walkmap at Pixel Position
 // ============================================================================
 
-far fn test_map(x @ A: u8, y @ X: u16) -> u8 {
+far fn test_map(x: u8, y: u16) -> u8 {
     let offset: u16 = WMAP_OFF!(x, X);
     return walkmap[offset];
 }
@@ -249,7 +249,7 @@ far fn player_init() {
 // Returns 0 if should skip this frame, non-zero if should move
 // ============================================================================
 
-far fn player_horz_div(n @ A: u8) -> u8 {
+far fn player_horz_div(n: u8) -> u8 {
     player_speed_div++;
 
     if player_speed_div >= n {
@@ -318,7 +318,7 @@ far fn player_clip_right() -> u8 {
 // FUNCTION: Process Player Movement (Ground/Walking)
 // ============================================================================
 
-far fn player_process_ground(pad @ A: u16) {
+far fn player_process_ground(pad: u16) {
     let floor1: u8;
     let floor2: u8;
 
@@ -361,7 +361,7 @@ far fn player_process_ground(pad @ A: u16) {
 // FUNCTION: Check and Start Climbing Ladder
 // ============================================================================
 
-far fn player_check_ladder(pad @ A: u16) {
+far fn player_check_ladder(pad: u16) {
     let floor1: u8;
     let floor2: u8;
 
@@ -404,7 +404,7 @@ far fn player_check_ladder(pad @ A: u16) {
 // FUNCTION: Process Ladder Climbing
 // ============================================================================
 
-far fn player_process_ladder(pad @ A: u16) {
+far fn player_process_ladder(pad: u16) {
     let floor1: u8;
     let x: u8 = player_x + 7;
     let anim: u8 = FALSE;
@@ -551,7 +551,7 @@ far fn player_push_out_of_floor() {
 // FUNCTION: Process Jump
 // ============================================================================
 
-far fn player_process_jump(pad @ A: u16) {
+far fn player_process_jump(pad: u16) {
     let dy: i8;
     let floor1: u8;
 
@@ -733,7 +733,7 @@ far fn player_update_oam() {
 // Returns: 0 = OK, LEVEL_LOSE = player died
 // ============================================================================
 
-far fn player_update(pad @ A: u16) -> u8 {
+far fn player_update(pad: u16) -> u8 {
     let result: u8 = 0;
 
     // Handle rivet delay countdown

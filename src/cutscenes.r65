@@ -59,7 +59,7 @@ static platform_anim: [u16; 14] = [
 // FUNCTION: Display Press Start Message
 // ============================================================================
 
-far fn title_screen_press_start_str(show @ A: u8) {
+far fn title_screen_press_start_str(show: u8) {
     if show != 0 {
         put_str(&nametable1[POS!(10, 22)] as *u16, &str_press_start as far *u8);
     } else {
@@ -72,7 +72,7 @@ far fn title_screen_press_start_str(show @ A: u8) {
 // FUNCTION: Fill Rectangle in Nametable with Tiles
 // ============================================================================
 
-far fn title_set_rect(off @ X: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
+far fn title_set_rect(off: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
     let row: u8 = 0;
     let current_tile: u16 = tile;
     let pos: u16 = off;
@@ -101,7 +101,7 @@ far fn title_set_rect(off @ X: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
 // FUNCTION: Put Number (decimal)
 // ============================================================================
 
-far fn put_num(dest @ X: *u16, value: u16, digits: u8) {
+far fn put_num(dest: *u16, value: u16, digits: u8) {
     let d: u8 = digits;
     let v: u16 = value;
 

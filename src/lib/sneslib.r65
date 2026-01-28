@@ -1585,8 +1585,7 @@ macro_rules! set_virq($pos:expr) {
 // Wait for VBlank (polling loop)
 far fn wait_vblank() {
     loop {
-        A = HVBJOY;
-        if A & 0x80 != 0 {
+        if (HVBJOY & 0x80) != 0 {
             break;
         }
     }
@@ -1594,10 +1593,9 @@ far fn wait_vblank() {
 
 // Wait for NMI (clears NMI flag first)
 far fn wait_nmi() {
-    A = RDNMI;
+    let dummy: u8 = RDNMI;  // Clear NMI flag
     loop {
-        A = RDNMI;
-        if A & 0x80 != 0 {
+        if (RDNMI & 0x80) != 0 {
             break;
         }
     }
@@ -1606,8 +1604,7 @@ far fn wait_nmi() {
 // Wait for auto-joypad read to complete
 far fn wait_autojoy() {
     loop {
-        A = HVBJOY;
-        if A & 0x01 == 0 {
+        if (HVBJOY & 0x01) == 0 {
             break;
         }
     }
@@ -1619,15 +1616,15 @@ far fn clear_vram() {
     VMADDH = 0;
     VMAIN = VMAIN_INCREMENT_HIGH;
 
-    X = 0;
-    Y = 0;
+    let i: u16 = 0;
+    let j: u16 = 0;
     loop {
         VMDATAL = 0;
         VMDATAH = 0;
-        X++;
-        if X == 0 {
-            Y++;
-            if Y == 0x80 {
+        i++;
+        if i == 0 {
+            j++;
+            if j == 0x80 {
                 break;
             }
         }
@@ -1637,12 +1634,12 @@ far fn clear_vram() {
 // Clear CGRAM (all colors to black)
 far fn clear_cgram() {
     CGADD = 0;
-    X = 0;
+    let i: u16 = 0;
     loop {
         CGDATA = 0;
         CGDATA = 0;
-        X++;
-        if X == 0 {
+        i++;
+        if i == 256 {
             break;
         }
     }
@@ -1653,24 +1650,24 @@ far fn clear_oam() {
     OAMADDL = 0;
     OAMADDH = 0;
 
-    X = 0;
+    let i: u16 = 0;
     loop {
         OAMDATA = 0;
         OAMDATA = 240;  // Y off-screen
         OAMDATA = 0;
         OAMDATA = 0;
-        X++;
-        if X == 128 {
+        i++;
+        if i == 128 {
             break;
         }
     }
 
     // Extended table
-    X = 0;
+    i = 0;
     loop {
         OAMDATA = 0;
-        X++;
-        if X == 32 {
+        i++;
+        if i == 32 {
             break;
         }
     }
@@ -1766,11 +1763,12 @@ far fn snes_init() {
 
 // Delay for specified number of frames
 // Usage: delay(60);  // Wait ~1 second (NTSC)
-far fn delay(frames @ X: u16) {
+far fn delay(frames: u16) {
+    let count: u16 = frames;
     loop {
         wait_nmi();
-        X--;
-        if X == 0 {
+        count--;
+        if count == 0 {
             break;
         }
     }
@@ -1779,69 +1777,63 @@ far fn delay(frames @ X: u16) {
 // Check if console is NTSC (returns 1) or PAL (returns 0)
 // Usage: if is_ntsc() { ... }
 far fn is_ntsc() -> u8 {
-    A = STAT78;
-    A = A & 0x10;
-    if A == 0 {
-        A = 1;  // Bit clear = NTSC
+    if (STAT78 & 0x10) == 0 {
+        return 1;  // Bit clear = NTSC
     } else {
-        A = 0;  // Bit set = PAL
+        return 0;  // Bit set = PAL
     }
-    return A;
 }
 
 // Check if console is PAL (returns 1) or NTSC (returns 0)
 // Usage: if is_pal() { ... }
 far fn is_pal() -> u8 {
-    A = STAT78;
-    A = A & 0x10;
-    if A != 0 {
-        A = 1;  // Bit set = PAL
+    if (STAT78 & 0x10) != 0 {
+        return 1;  // Bit set = PAL
     } else {
-        A = 0;  // Bit clear = NTSC
+        return 0;  // Bit clear = NTSC
     }
-    return A;
 }
 
 // Set pixelization/mosaic effect (user-friendly version)
 // level: 0 = off, 1-16 = min to max pixelization
 // bgs: which backgrounds to apply mosaic to (use SCREEN_BG1, etc.)
 // Usage: set_pixelize(4, SCREEN_BG1 | SCREEN_BG2);
-far fn set_pixelize(level @ A: u8, bgs @ X: u16) {
-    if A == 0 {
+far fn set_pixelize(level: u8, bgs: u16) {
+    if level == 0 {
         MOSAIC = 0;
     } else {
         // Convert 1-16 to mosaic size (0-15 in high nibble)
-        A--;
-        A = A << 4;
-        A = A | X;
-        MOSAIC = A;
+        let val: u8 = level - 1;
+        val = val << 4;
+        val = val | (bgs as u8);
+        MOSAIC = val;
     }
 }
 
 // Set scroll for a specific layer (0-3)
 // Mirrors the layer-indexed approach from sneslib.h
 // Usage: set_scroll(0, x_scroll, y_scroll);  // Set BG1 scroll
-far fn set_scroll(layer @ A: u8, scroll_x @ X: u16, scroll_y @ Y: u16) {
-    if A == 0 {
-        BG1HOFS = X;
-        BG1HOFS = 0;
-        BG1VOFS = Y;
-        BG1VOFS = 0;
-    } else if A == 1 {
-        BG2HOFS = X;
-        BG2HOFS = 0;
-        BG2VOFS = Y;
-        BG2VOFS = 0;
-    } else if A == 2 {
-        BG3HOFS = X;
-        BG3HOFS = 0;
-        BG3VOFS = Y;
-        BG3VOFS = 0;
+far fn set_scroll(layer: u8, scroll_x: u16, scroll_y: u16) {
+    if layer == 0 {
+        BG1HOFS = scroll_x as u8;
+        BG1HOFS = (scroll_x >> 8) as u8;
+        BG1VOFS = scroll_y as u8;
+        BG1VOFS = (scroll_y >> 8) as u8;
+    } else if layer == 1 {
+        BG2HOFS = scroll_x as u8;
+        BG2HOFS = (scroll_x >> 8) as u8;
+        BG2VOFS = scroll_y as u8;
+        BG2VOFS = (scroll_y >> 8) as u8;
+    } else if layer == 2 {
+        BG3HOFS = scroll_x as u8;
+        BG3HOFS = (scroll_x >> 8) as u8;
+        BG3VOFS = scroll_y as u8;
+        BG3VOFS = (scroll_y >> 8) as u8;
     } else {
-        BG4HOFS = X;
-        BG4HOFS = 0;
-        BG4VOFS = Y;
-        BG4VOFS = 0;
+        BG4HOFS = scroll_x as u8;
+        BG4HOFS = (scroll_x >> 8) as u8;
+        BG4VOFS = scroll_y as u8;
+        BG4VOFS = (scroll_y >> 8) as u8;
     }
 }
 
@@ -1854,60 +1846,54 @@ far fn set_scroll(layer @ A: u8, scroll_x @ X: u16, scroll_y @ Y: u16) {
 far fn spc_wait_ready() -> u8 {
     let timeout: u8 = 0;
     loop {
-        A = APUIO0;
-        if A == 0xAA {
-            A = APUIO1;
-            if A == 0xBB {
-                A = 1;
-                return A;
+        if APUIO0 == 0xAA {
+            if APUIO1 == 0xBB {
+                return 1;
             }
         }
         timeout++;
         if timeout == 0 {
-            A = 0;
-            return A;
+            return 0;
         }
     }
 }
 
 // Begin SPC700 transfer to destination address
-far fn spc_begin_transfer(dest_low @ A: u8, dest_high @ X: u16) {
+far fn spc_begin_transfer(dest_low: u8, dest_high: u16) {
     APUIO2 = dest_low;
-    APUIO3 = dest_high;
+    APUIO3 = dest_high as u8;
     APUIO1 = 0x01;
     APUIO0 = 0xCC;
 
     loop {
-        A = APUIO0;
-        if A == 0xCC {
+        if APUIO0 == 0xCC {
             break;
         }
     }
 }
 
 // Transfer byte to SPC700
-far fn spc_transfer_byte(data @ A: u8, index @ X: u16) {
+far fn spc_transfer_byte(data: u8, index: u16) {
     APUIO1 = data;
-    APUIO0 = index;
+    APUIO0 = index as u8;
 
     loop {
-        A = APUIO0;
-        if A == index {
+        if APUIO0 == (index as u8) {
             break;
         }
     }
 }
 
 // End SPC700 transfer and start execution
-far fn spc_end_transfer(exec_low @ A: u8, exec_high @ X: u16) {
+far fn spc_end_transfer(exec_low: u8, exec_high: u16) {
     APUIO2 = exec_low;
-    APUIO3 = exec_high;
+    APUIO3 = exec_high as u8;
 
-    A = APUIO0;
-    A = A + 2;
-    A = A & 0xFE;
+    let val: u8 = APUIO0;
+    val = val + 2;
+    val = val & 0xFE;
     APUIO1 = 0;
-    APUIO0 = A;
+    APUIO0 = val;
 }
 
 

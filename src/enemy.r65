@@ -263,11 +263,11 @@ static bounce_speed: [i16; 10] = [
 
 far fn enemy_clear() {
     // Clear all enemy types
-    X = 0;
+    let i: u16 = 0;
     loop {
-        enemy_type[X] = ENEMY_NONE;
-        X++;
-        if X >= ENEMY_MAX as u16 {
+        enemy_type[i] = ENEMY_NONE;
+        i++;
+        if i >= ENEMY_MAX as u16 {
             break;
         }
     }
@@ -276,12 +276,12 @@ far fn enemy_clear() {
     enemy_all = 0;
 
     // Hide all enemy sprites
-    X = 0;
+    i = 0;
     loop {
-        let spr: u16 = OAM_ENEMY + (X << 2);
+        let spr: u16 = OAM_ENEMY + (i << 2);
         oam_spr1(0, 240, 0, spr);
-        X++;
-        if X >= ENEMY_MAX as u16 {
+        i++;
+        if i >= ENEMY_MAX as u16 {
             break;
         }
     }
@@ -293,7 +293,7 @@ far fn enemy_clear() {
 // Returns TRUE if successful, FALSE if no room
 // ============================================================================
 
-far fn enemy_add(etype @ A: u8, ex: u8, ey: u8, edx: i8) -> u8 {
+far fn enemy_add(etype: u8, ex: u8, ey: u8, edx: i8) -> u8 {
     let i: u8 = enemy_free;
     let j: u8 = 0;
 
@@ -388,7 +388,7 @@ far fn enemy_add(etype @ A: u8, ex: u8, ey: u8, edx: i8) -> u8 {
 // Returns TRUE if should spawn fireball (barrel hit fire)
 // ============================================================================
 
-far fn enemy_remove(i @ A: u8, destroy: u8) -> u8 {
+far fn enemy_remove(i: u8, destroy: u8) -> u8 {
     let fire: u8 = FALSE;
 
     // Hide sprite
@@ -438,7 +438,7 @@ far fn enemy_remove(i @ A: u8, destroy: u8) -> u8 {
 // Returns TRUE if player jumped over enemy
 // ============================================================================
 
-far fn enemy_check_object_jump(ox @ A: u8, oy @ X: u16) -> u8 {
+far fn enemy_check_object_jump(ox: u8, oy: u16) -> u8 {
     // Check if enemy is below player and player is jumping
     if oy >= player_y + 12 {
         if oy < player_jump_y + 8 {
@@ -461,7 +461,7 @@ far fn enemy_check_object_jump(ox @ A: u8, oy @ X: u16) -> u8 {
 // FUNCTION: Process Rolling Barrel
 // ============================================================================
 
-far fn process_rolling_barrel(i @ A: u8, spr @ X: u16) -> u8 {
+far fn process_rolling_barrel(i: u8, spr: u16) -> u8 {
     let ox: u8 = enemy_x[i];
     let oy: u8 = enemy_y[i];
     let sy: u8;
@@ -589,7 +589,7 @@ far fn process_rolling_barrel(i @ A: u8, spr @ X: u16) -> u8 {
 // FUNCTION: Process Ladder Barrel
 // ============================================================================
 
-far fn process_ladder_barrel(i @ A: u8, spr @ X: u16) {
+far fn process_ladder_barrel(i: u8, spr: u16) {
     let ox: u8 = enemy_x[i];
     let oy: u8 = enemy_y[i];
 
@@ -623,7 +623,7 @@ far fn process_ladder_barrel(i @ A: u8, spr @ X: u16) {
 // FUNCTION: Process Wild Barrel
 // ============================================================================
 
-far fn process_wild_barrel(i @ A: u8, spr @ X: u16, etype: u8) {
+far fn process_wild_barrel(i: u8, spr: u16, etype: u8) {
     let ox: u8 = enemy_x[i];
     let oy: u8 = enemy_y[i];
 
@@ -685,7 +685,7 @@ far fn process_wild_barrel(i @ A: u8, spr @ X: u16, etype: u8) {
 // FUNCTION: Process Fireball
 // ============================================================================
 
-far fn process_fireball(i @ A: u8, spr @ X: u16, etype: u8) {
+far fn process_fireball(i: u8, spr: u16, etype: u8) {
     let ox: u8 = enemy_x[i];
     let oy: u8 = enemy_y[i];
     let dx: i8 = enemy_dx[i];
@@ -834,7 +834,7 @@ far fn process_fireball(i @ A: u8, spr @ X: u16, etype: u8) {
 // FUNCTION: Process Bounce Enemy
 // ============================================================================
 
-far fn process_bounce(i @ A: u8, spr @ X: u16) -> u8 {
+far fn process_bounce(i: u8, spr: u16) -> u8 {
     let ox: u8 = (enemy_ix[i] >> BOUNCE_FP) as u8;
     let oy: u8 = (enemy_iy[i] >> BOUNCE_FP) as u8;
 
@@ -908,7 +908,7 @@ far fn process_bounce(i @ A: u8, spr @ X: u16) -> u8 {
 // Returns TRUE if collision detected
 // ============================================================================
 
-far fn enemy_check_player_collision(ox @ A: u8, oy @ X: u16) -> u8 {
+far fn enemy_check_player_collision(ox: u8, oy: u16) -> u8 {
     // Alternating frame collision checks
     if (game_frame_cnt & 1) != 0 {
         if player_y + 12 > oy + 4 {
@@ -930,7 +930,7 @@ far fn enemy_check_player_collision(ox @ A: u8, oy @ X: u16) -> u8 {
 // Returns TRUE if hammer hit enemy
 // ============================================================================
 
-far fn enemy_check_hammer_collision(i @ A: u8, ox: u8, oy: u8) -> u8 {
+far fn enemy_check_hammer_collision(i: u8, ox: u8, oy: u8) -> u8 {
     // Check if hammer is active and player is grounded
     if player_hammer_time == 0 {
         return FALSE;

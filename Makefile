@@ -25,8 +25,9 @@ $(BUILD_DIR)/main.asm: $(MAIN_SRC) $(wildcard src/lib/*.r65)
 	$(R65C) $(MAIN_SRC) -o $@ $(R65C_FLAGS)
 
 # Assemble WLA-DX object file
+# Run from src/ directory so relative paths in INCBIN work correctly
 $(BUILD_DIR)/main.o: $(BUILD_DIR)/main.asm
-	$(WLA) $(WLA_FLAGS) $@ $<
+	cd src && $(WLA) $(WLA_FLAGS) ../build/main.o ../build/main.asm
 
 # Link object file to ROM
 $(ROM_FILE): $(BUILD_DIR)/main.o

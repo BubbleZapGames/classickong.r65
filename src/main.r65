@@ -412,11 +412,11 @@ far fn title_screen() -> u8 {
 
 far fn init_test_walkmap() {
     // Clear walkmap
-    X = 0;
+    let i: u16 = 0;
     loop {
-        walkmap[X] = 0;
-        X++;
-        if X >= 7168 {
+        walkmap[i] = 0;
+        i++;
+        if i >= 7168 {
             break;
         }
     }
@@ -426,11 +426,11 @@ far fn init_test_walkmap() {
     let row: u16 = 200;  // Y position in pixels
     let offset: u16 = row << 5;  // row * 32
 
-    X = offset;
+    i = offset;
     let col: u8 = 0;
     loop {
-        walkmap[X] = T_FLOOR;
-        X++;
+        walkmap[i] = T_FLOOR;
+        i++;
         col++;
         if col >= 32 {
             break;
@@ -441,11 +441,11 @@ far fn init_test_walkmap() {
     row = 160;
     offset = row << 5;
     offset = offset + 10;  // Start at column 10
-    X = offset;
+    i = offset;
     col = 0;
     loop {
-        walkmap[X] = T_FLOOR;
-        X++;
+        walkmap[i] = T_FLOOR;
+        i++;
         col++;
         if col >= 12 {
             break;
@@ -473,22 +473,22 @@ far fn init_test_walkmap() {
 far fn draw_test_level() {
     // Draw floor tiles at Y=200 (tile row 25)
     let pos: u16 = POS!(0, 25);
-    X = 0;
+    let i: u16 = 0;
     loop {
-        nametable1[pos + X] = 0x144 | BG_PAL!(1);  // Floor tile
-        X++;
-        if X >= 32 {
+        nametable1[pos + i] = 0x144 | BG_PAL!(1);  // Floor tile
+        i++;
+        if i >= 32 {
             break;
         }
     }
 
     // Draw platform tiles at Y=160 (tile row 20)
     pos = POS!(10, 20);
-    X = 0;
+    i = 0;
     loop {
-        nametable1[pos + X] = 0x144 | BG_PAL!(1);
-        X++;
-        if X >= 12 {
+        nametable1[pos + i] = 0x144 | BG_PAL!(1);
+        i++;
+        if i >= 12 {
             break;
         }
     }
