@@ -1,0 +1,144 @@
+// ============================================================================
+// Hardware Initialization - Placed in bank 5 to avoid bank 0 overflow
+// ============================================================================
+// This module provides comprehensive PPU/CPU register initialization
+// matching the original ROM's startup sequence.
+// ============================================================================
+
+#[bank(5)]
+
+// Full PPU register initialization
+// Initializes all PPU registers to safe defaults (matching original ROM)
+far fn hw_init_ppu() {
+    // Force blank during init (0x8F = force blank + full brightness)
+    INIDISP = 0x8F;
+
+    // OAM settings
+    OBSEL = 0;
+    OAMADDL = 0;
+    OAMADDH = 0;
+
+    // BG mode
+    BGMODE = 0;
+    MOSAIC = 0;
+
+    // Tilemap addresses
+    BG1SC = 0;
+    BG2SC = 0;
+    BG3SC = 0;
+    BG4SC = 0;
+
+    // Character base addresses
+    BG12NBA = 0;
+    BG34NBA = 0;
+
+    // BG1 scroll (write twice for 10-bit value)
+    BG1HOFS = 0;
+    BG1HOFS = 0;
+    BG1VOFS = 0;
+    BG1VOFS = 0;
+
+    // BG2 scroll
+    BG2HOFS = 0;
+    BG2HOFS = 0;
+    BG2VOFS = 0;
+    BG2VOFS = 0;
+
+    // BG3 scroll
+    BG3HOFS = 0;
+    BG3HOFS = 0;
+    BG3VOFS = 0;
+    BG3VOFS = 0;
+
+    // BG4 scroll
+    BG4HOFS = 0;
+    BG4HOFS = 0;
+    BG4VOFS = 0;
+    BG4VOFS = 0;
+
+    // VRAM access
+    VMAIN = VMAIN_INCREMENT_HIGH;
+    VMADDL = 0;
+    VMADDH = 0;
+
+    // Mode 7 settings (identity matrix: A=1, D=1, others=0)
+    M7SEL = 0;
+    M7A = 0;  // Low byte first
+    M7A = 1;  // High byte (1.0 in fixed point)
+    M7B = 0;
+    M7B = 0;
+    M7C = 0;
+    M7C = 0;
+    M7D = 0;  // Low byte first
+    M7D = 1;  // High byte (1.0 in fixed point)
+    M7X = 0;
+    M7X = 0;
+    M7Y = 0;
+    M7Y = 0;
+
+    // CGRAM address
+    CGADD = 0;
+
+    // Window settings
+    W12SEL = 0;
+    W34SEL = 0;
+    WOBJSEL = 0;
+    WH0 = 0;
+    WH1 = 0;
+    WH2 = 0;
+    WH3 = 0;
+    WBGLOG = 0;
+    WOBJLOG = 0;
+
+    // Screen layer enables (TM=$01 enables BG1, matching original)
+    TM = 0x01;
+    TS = 0;
+    TMW = 0;
+    TSW = 0;
+
+    // Color math (match original ROM values)
+    CGWSEL = 0x30;
+    CGADSUB = 0;
+    COLDATA = 0xE0;  // All planes, intensity 0
+
+    // Video mode
+    SETINI = 0;
+}
+
+// Full CPU register initialization
+// Initializes CPU I/O registers to safe defaults (order matches original ROM)
+far fn hw_init_cpu() {
+    // Disable NMI/IRQ initially
+    NMITIMEN = 0;
+
+    // I/O port
+    WRIO = 0xFF;
+
+    // Clear math registers
+    WRMPYA = 0;
+    WRMPYB = 0;
+    WRDIVL = 0;
+    WRDIVH = 0;
+    WRDIVB = 0;
+
+    // Clear timer registers
+    HTIMEL = 0;
+    HTIMEH = 0;
+    VTIMEL = 0;
+    VTIMEH = 0;
+
+    // Disable DMA
+    MDMAEN = 0;
+
+    // Disable HDMA
+    HDMAEN = 0;
+
+    // FastROM - original doesn't enable during init (game_init does it later)
+    MEMSEL = 0;
+}
+
+// Combined initialization
+far fn hw_init_all() {
+    hw_init_ppu();
+    hw_init_cpu();
+}

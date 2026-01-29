@@ -35,6 +35,9 @@ include!("cutscenes.r65")
 // Include sound and music
 include!("sound.r65")
 
+// Include hardware initialization (in separate bank to avoid overflow)
+include!("hw_init.r65")
+
 
 // ============================================================================
 // GAME STATE VARIABLES
@@ -663,7 +666,11 @@ far fn game_loop() -> u8 {
 
 #[entry]
 far fn main() -> ! {
-    // Initialize hardware
+    // Initialize all PPU/CPU registers to safe defaults
+    // (matches original ROM's comprehensive initialization)
+    hw_init_all();
+
+    // Initialize game-specific hardware settings
     game_init();
 
     // Clear VRAM
