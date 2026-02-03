@@ -7,6 +7,20 @@
 // Place all functions in bank 0 (data.r65 bank directives would otherwise carry over)
 #[bank(0)]
 
+
+// ============================================================================
+// SCRATCH REGISTERS - Direct page temporaries for compiler use
+// ============================================================================
+// These are used by the compiler for operations that require direct page
+// addressing (BIT, etc.) when operands are on the stack.
+
+#[zeropage(0x00, register)]
+static mut SCRATCH0: u8;
+
+#[zeropage(0x01, register)]
+static mut SCRATCH1: u8;
+
+
 // ============================================================================
 // RAM VARIABLES - Joypad State
 // ============================================================================
@@ -112,6 +126,8 @@ static mut back_graphics: [u16; 3072];  // Mask graphics buffer
 // ============================================================================
 // CONSTANTS - Joypad Buttons
 // ============================================================================
+// Note: These are equivalent to JOY_* constants in sneslib.r65
+// Using PAD_* naming for consistency with original codebase
 
 const PAD_B: u16 = 0x8000;
 const PAD_Y: u16 = 0x4000;
@@ -175,6 +191,9 @@ far fn rand() -> u16 {
 
 #[interrupt(nmi)]
 far fn nmi_handler() {
+    // Acknowledge NMI by reading RDNMI (required for subsequent NMIs to fire)
+    let _ @ A: u8 = RDNMI;
+
     // DMA OAM buffer to PPU (channel 7)
     OAMADDL = 0;
     OAMADDH = 0;
@@ -220,12 +239,8 @@ far fn nmi_wait() {
 // ============================================================================
 
 far fn pad_read_ports() {
-    // Wait for joypad read to complete
-    loop {
-        if (HVBJOY & 0x01) == 0 {
-            break;
-        }
-    }
+    // Wait for joypad read to complete (use sneslib function)
+    wait_autojoy();
 
     // Read joypad 1
     let current: u16 = (JOY1H as u16) << 8 | (JOY1L as u16);
@@ -290,7 +305,7 @@ far fn set_pal_src(addr: u16, bank: u8) {
     pal_src_bank = bank;
 }
 
-far fn set_palette(start: u16, count: u16) {
+far fn set_palette(start @ X: u16, count @ Y: u16) {
     // Copy palette data - pure assembly for reliability
     // X = start color index, Y = color count
     // pal_src_addr/pal_src_bank at $10-$12 = source far pointer
@@ -298,19 +313,21 @@ far fn set_palette(start: u16, count: u16) {
         "STX $14",              // $14-15 = dest index
         "STY $16",              // $16-17 = count
         "LDY #$0000",           // Y = source byte offset
+        "REP #$20",             // Switch to 16-bit A for color loading
         "__pal_loop:",
         "LDA [$10],Y",          // Load 16-bit color from source
-        "PHA",                  // Save color
-        "LDA $14",              // Load dest index
+        "PHA",                  // Save color (16-bit)
+        "LDA $14",              // Load dest index (still works in 16-bit)
         "ASL A",                // *2 for byte offset
         "TAX",
-        "PLA",                  // Restore color
-        "STA $7E2000,X",        // Store to palette_buffer
+        "PLA",                  // Restore color (16-bit)
+        "STA $7E2000,X",        // Store 16-bit to palette_buffer
         "INC $14",              // dest++
         "INY",
         "INY",                  // Y += 2
         "DEC $16",              // count--
-        "BNE __pal_loop"
+        "BNE __pal_loop",
+        "SEP #$20"              // Restore 8-bit A mode
     );
 }
 
@@ -365,13 +382,15 @@ far fn update_palette() {
 // NOTE: Uses zeropage variables for source address to avoid far pointer
 // parameter passing bug in the compiler.
 
-#[zeropage]
+// Explicitly allocate at safe addresses to avoid being corrupted by
+// buggy array index codegen (joypad_state[0]=0 writes to $00 instead of $0200)
+#[zeropage(0x14)]
 static mut dma_src_addr: u16;
 
-#[zeropage]
+#[zeropage(0x16)]
 static mut dma_src_bank: u8;
 
-far fn copy_to_vram(vram_addr: u16, size: u16) {
+far fn copy_to_vram(vram_addr @ X: u16, size @ Y: u16) {
     // Set VRAM address - use 16-bit store since VMADDL/VMADDH are contiguous
     asm!("STX $2116");  // 16-bit store to VMADDL ($2116) + VMADDH ($2117)
     VMAIN = 0x80;  // Increment after high byte
@@ -409,11 +428,11 @@ const RAM_BANK: u8 = 0x7E;     // Main SNES RAM ($7E0000-$7FFFFF)
 // FUNCTION: Fill VRAM with Value via DMA
 // ============================================================================
 
-#[zeropage]
+#[zeropage(0x17)]
 static mut fill_value: u8;
 
-far fn fill_vram(vram_addr: u16, value: u8, size: u16) {
-    fill_value = value;
+far fn fill_vram(vram_addr @ X: u16, value @ A: u8, size @ Y: u16) {
+    fill_value = A;
 
     VMADDL = X as u8;
     VMADDH = (X >> 8) as u8;
@@ -544,10 +563,11 @@ far fn oam_clear() {
 // ============================================================================
 
 far fn set_bright(level: u8) {
+    // Use sneslib macros for screen control
     if level == 0 {
-        INIDISP = 0x80;  // Force blank
+        screen_off!();
     } else {
-        INIDISP = level;
+        screen_on!(level);
     }
 }
 
@@ -557,26 +577,19 @@ far fn set_bright(level: u8) {
 // ============================================================================
 
 far fn set_scroll_layer(layer: u8, x: u16, y: u16) {
+    // Use sneslib scroll macros for write-twice pattern
     if layer == 0 {
-        BG1HOFS = x as u8;
-        BG1HOFS = (x >> 8) as u8;
-        BG1VOFS = y as u8;
-        BG1VOFS = (y >> 8) as u8;
+        set_bg1_hscroll!(x);
+        set_bg1_vscroll!(y);
     } else if layer == 1 {
-        BG2HOFS = x as u8;
-        BG2HOFS = (x >> 8) as u8;
-        BG2VOFS = y as u8;
-        BG2VOFS = (y >> 8) as u8;
+        set_bg2_hscroll!(x);
+        set_bg2_vscroll!(y);
     } else if layer == 2 {
-        BG3HOFS = x as u8;
-        BG3HOFS = (x >> 8) as u8;
-        BG3VOFS = y as u8;
-        BG3VOFS = (y >> 8) as u8;
+        set_bg3_hscroll!(x);
+        set_bg3_vscroll!(y);
     } else {
-        BG4HOFS = x as u8;
-        BG4HOFS = (x >> 8) as u8;
-        BG4VOFS = y as u8;
-        BG4VOFS = (y >> 8) as u8;
+        set_bg4_hscroll!(x);
+        set_bg4_vscroll!(y);
     }
 }
 
@@ -622,8 +635,8 @@ far fn game_init() {
     BG12NBA = 0x40;  // BG1 at $0000, BG2 at $4000
     BG34NBA = 0x44;  // BG3 and 4 at $4000
 
-    // Enable sprites and backgrounds
-    TM = 0x13;  // OBJ + BG1 + BG2
+    // Enable sprites and backgrounds (use sneslib macro)
+    enable_main!(SCREEN_OBJ | SCREEN_BG1 | SCREEN_BG2);
 
     // Sprite settings: 8x8 and 16x16, graphics at $2000
     OBSEL = 1;
@@ -649,8 +662,8 @@ far fn game_init() {
     set_bright(0);
     oam_clear();
 
-    // Enable NMI and joypad
-    NMITIMEN = 0x81;
+    // Enable NMI and joypad (use sneslib macro)
+    set_nmitimen!(NMI_ENABLE | AUTOJOY_ENABLE);
 }
 
 

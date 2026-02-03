@@ -129,11 +129,9 @@ far fn full_title_screen() -> u8 {
     set_bright(0);
     oam_clear();
 
-    // Copy title graphics to VRAM
-    set_dma_src(&title_top_gfx as *u8 as u16, DATA_BANK_4);
-    copy_to_vram(0x1800, 2400);
-    set_dma_src(&title_bottom_gfx as *u8 as u16, DATA_BANK_4);
-    copy_to_vram(0x1CB0, 6912);
+    // Copy title graphics to VRAM (use sneslib DMA macro)
+    dma_copy_vram_const!(0, title_top_gfx_data, 6144, 2400);    // 6144 = $1800
+    dma_copy_vram_const!(0, title_bottom_gfx_data, 7344, 6912); // 7344 = $1CB0
 
     clear_nametables();
 

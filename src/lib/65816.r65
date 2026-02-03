@@ -93,3 +93,10 @@ macro_rules! modeM8X8($body:tt) {
     STATUS.A16 = true;
     STATUS.XY16 = true;
 }
+
+// ============================================================================
+// Boolean Constants (not in stdlib)
+// ============================================================================
+
+const FALSE: u8 = 0;
+const TRUE: u8 = 1;

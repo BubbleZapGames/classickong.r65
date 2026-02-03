@@ -32,29 +32,15 @@ far fn hw_init_ppu() {
     BG12NBA = 0;
     BG34NBA = 0;
 
-    // BG1 scroll (write twice for 10-bit value)
-    BG1HOFS = 0;
-    BG1HOFS = 0;
-    BG1VOFS = 0;
-    BG1VOFS = 0;
-
-    // BG2 scroll
-    BG2HOFS = 0;
-    BG2HOFS = 0;
-    BG2VOFS = 0;
-    BG2VOFS = 0;
-
-    // BG3 scroll
-    BG3HOFS = 0;
-    BG3HOFS = 0;
-    BG3VOFS = 0;
-    BG3VOFS = 0;
-
-    // BG4 scroll
-    BG4HOFS = 0;
-    BG4HOFS = 0;
-    BG4VOFS = 0;
-    BG4VOFS = 0;
+    // BG scroll registers (use sneslib macros for write-twice pattern)
+    set_bg1_hscroll!(0);
+    set_bg1_vscroll!(0);
+    set_bg2_hscroll!(0);
+    set_bg2_vscroll!(0);
+    set_bg3_hscroll!(0);
+    set_bg3_vscroll!(0);
+    set_bg4_hscroll!(0);
+    set_bg4_vscroll!(0);
 
     // VRAM access
     VMAIN = VMAIN_INCREMENT_HIGH;
@@ -90,9 +76,9 @@ far fn hw_init_ppu() {
     WBGLOG = 0;
     WOBJLOG = 0;
 
-    // Screen layer enables (TM=$01 enables BG1, matching original)
-    TM = 0x01;
-    TS = 0;
+    // Screen layer enables (use sneslib macros)
+    enable_main!(SCREEN_BG1);
+    enable_sub!(0);
     TMW = 0;
     TSW = 0;
 
@@ -127,11 +113,9 @@ far fn hw_init_cpu() {
     VTIMEL = 0;
     VTIMEH = 0;
 
-    // Disable DMA
+    // Disable DMA and HDMA (use sneslib macro for HDMA)
     MDMAEN = 0;
-
-    // Disable HDMA
-    HDMAEN = 0;
+    disable_hdma!();
 
     // FastROM - original doesn't enable during init (game_init does it later)
     MEMSEL = 0;

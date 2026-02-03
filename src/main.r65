@@ -7,7 +7,7 @@
 #[snesrom(name = "CLASSIC KONG", lorom, fastrom)]
 
 // Include standard libraries
-include!("lib/sneslib.r65")
+include!("../../stdlib/sneslib.r65")
 include!("lib/math.r65")
 include!("lib/65816.r65")
 
@@ -214,20 +214,15 @@ far fn setup_palettes() {
 // ============================================================================
 
 far fn setup_ingame_graphics() {
-    let offset: u16 = 0x2000;
-
-    set_dma_src(&sprites1_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(offset + (PLAYER_TILE << 4), 3072);
-    set_dma_src(&sprites2_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(offset + (ITEMS_TILE << 4), 2048);
-    set_dma_src(&sprites3_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(offset + (KONG_TILE << 4), 5120);
-    set_dma_src(&sprites4_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(offset + (BARREL_TILE << 4), 1024);
-    set_dma_src(&sprites5_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(offset + (ENEMY_TILE << 4), 4096);
-    set_dma_src(&sprites6_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(offset + (PRINCESS_TILE << 4), 1024);
+    // Use sneslib DMA macro for VRAM copies (channel 0)
+    // Sprite graphics start at VRAM $2000
+    // Note: Use _data suffix for WLA-DX label names, decimal for addresses
+    dma_copy_vram_const!(0, sprites1_gfx_data, 8192, 3072);    // $2000: Player sprites
+    dma_copy_vram_const!(0, sprites2_gfx_data, 9728, 2048);    // $2600: Item sprites
+    dma_copy_vram_const!(0, sprites3_gfx_data, 10752, 5120);   // $2A00: Kong sprites
+    dma_copy_vram_const!(0, sprites4_gfx_data, 13312, 1024);   // $3400: Barrel sprites
+    dma_copy_vram_const!(0, sprites5_gfx_data, 13824, 4096);   // $3600: Enemy sprites
+    dma_copy_vram_const!(0, sprites6_gfx_data, 15872, 1024);   // $3E00: Princess sprites
 }
 
 
@@ -237,26 +232,25 @@ far fn setup_ingame_graphics() {
 
 far fn show_logo() {
     // Set mode 3 for 256-color logo
-    BGMODE = 0x0B;  // Mode 3, 2 layers
+    BGMODE = BGMODE_3 | 0x08;  // Mode 3, BG3 priority
 
     // Nametable setup
     BG1SC = 0 << 2;
     BG2SC = 1 << 2;
-    BG12NBA = 0x70;  // Patterns at $7000
+    BG12NBA = 0x70;  // BG1 at $0000, BG2 graphics at $E000
 
-    // Copy logo graphics to VRAM
-    set_dma_src(&bzlogo_gfx as *u8 as u16, DATA_BANK_4);
-    copy_to_vram(0x0800, 7168);
+    // Copy logo graphics to VRAM (at $7000 to match BG12NBA)
+    dma_copy_vram_const!(0, bzlogo_gfx_data, 28672, 7168);  // 28672 = $7000
 
     // Copy logo palette (256 colors) - in bank 4
-    set_pal_src(&bzlogo_pal as *u8 as u16, DATA_BANK_4);
+    set_pal_src(0xC060, DATA_BANK_4);  // bzlogo_pal at 04:C060
     set_palette(0, 256);
 
     // Clear nametables
     clear_nametables();
 
-    // Set up logo tiles in nametable
-    let n: u16 = 64;
+    // Set up logo tiles in nametable (tiles start at 0 since graphics are at $7000)
+    let n: u16 = 0;
     let row: u8 = 0;
 
     loop {
@@ -380,8 +374,7 @@ far fn title_screen() -> u8 {
     put_str(&nametable1[POS!(6, 12)] as *u16, &str_press_start as far *u8);
 
     // Load font graphics
-    set_dma_src(&font_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(0x1000, 2048);
+    dma_copy_vram_const!(0, font_gfx_data, 4096, 2048);  // 4096 = $1000
 
     update_nametables();
     setup_palettes();
@@ -525,11 +518,9 @@ far fn game_loop() -> u8 {
     oam_clear();
     clear_nametables();
 
-    // Load level graphics
-    set_dma_src(&font_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(0x1000, 2048);
-    set_dma_src(&tileset1_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(0x1400, 2048);
+    // Load level graphics (use sneslib DMA macro)
+    dma_copy_vram_const!(0, font_gfx_data, 4096, 2048);     // 4096 = $1000
+    dma_copy_vram_const!(0, tileset1_gfx_data, 5120, 2048); // 5120 = $1400
 
     setup_ingame_graphics();
 
@@ -666,6 +657,10 @@ far fn game_loop() -> u8 {
 
 #[entry]
 far fn main() -> ! {
+    // Initialize Direct Page register to 0
+    // Critical: DMA functions use direct page addressing for zeropage variables
+    D = 0;
+
     // Initialize all PPU/CPU registers to safe defaults
     // (matches original ROM's comprehensive initialization)
     hw_init_all();
@@ -685,11 +680,9 @@ far fn main() -> ! {
     // Re-initialize for game mode
     game_init();
 
-    // Load shared graphics
-    set_dma_src(&font_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(0x1000, 2048);
-    set_dma_src(&tileset1_gfx as *u8 as u16, DATA_BANK_1);
-    copy_to_vram(0x1400, 2048);
+    // Load shared graphics (use sneslib DMA macro)
+    dma_copy_vram_const!(0, font_gfx_data, 4096, 2048);     // 4096 = $1000
+    dma_copy_vram_const!(0, tileset1_gfx_data, 5120, 2048); // 5120 = $1400
 
     // Initialize sound system
     spc_setup();
