@@ -249,8 +249,10 @@ far fn show_logo() {
     // Clear nametables
     clear_nametables();
 
-    // Set up logo tiles in nametable (tiles start at 0 since graphics are at $7000)
-    let n: u16 = 0;
+    // Set up logo tiles in nametable
+    // Graphics at VRAM $0800 words ($1000 bytes), BG1 base at $0000
+    // First tile = $1000 / 64 bytes per 8bpp tile = tile 64
+    let n: u16 = 64;
     let row: u8 = 0;
 
     loop {
