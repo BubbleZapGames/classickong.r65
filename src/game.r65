@@ -697,13 +697,9 @@ const NAMETABLE2_ADDR: u16 = 0x2C00;
 const NAMETABLE3_ADDR: u16 = 0x3400;
 
 far fn update_nametables() {
-    // Use hardcoded addresses to avoid compiler address-of bug
-    set_dma_src(NAMETABLE1_ADDR, RAM_BANK);
-    copy_to_vram(0x0000, 2048);
-    set_dma_src(NAMETABLE2_ADDR, RAM_BANK);
-    copy_to_vram(0x0400, 2048);
-    set_dma_src(NAMETABLE3_ADDR, RAM_BANK);
-    copy_to_vram(0x7C00, 2048);
+    dma_copy_vram_const!(2, nametable1, 0x0000, 1024);
+    dma_copy_vram_const!(3, nametable2, 0x0400, 2048);
+    dma_copy_vram_const!(4, nametable3, 0x7C00, 2048);
 }
 
 

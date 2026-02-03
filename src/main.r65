@@ -240,7 +240,7 @@ far fn show_logo() {
     BG12NBA = 0x70;  // BG1 at $0000, BG2 graphics at $E000
 
     // Copy logo graphics to VRAM (at $7000 to match BG12NBA)
-    dma_copy_vram_const!(0, bzlogo_gfx_data, 28672, 7168);  // 28672 = $7000
+	dma_copy_vram_const!(0, bzlogo_gfx_data, 2048, 7168);
 
     // Copy logo palette (256 colors) - in bank 4
     set_pal_src(0xC060, DATA_BANK_4);  // bzlogo_pal at 04:C060
