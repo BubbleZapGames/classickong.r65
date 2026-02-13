@@ -61,9 +61,9 @@ static platform_anim: [u16; 14] = [
 
 far fn title_screen_press_start_str(show: u8) {
     if show != 0 {
-        put_str(&nametable1[POS!(10, 22)] as *u16, &str_press_start as far *u8);
+        put_str(POS!(10, 22), &str_press_start as far *u8);
     } else {
-        put_str(&nametable1[POS!(10, 22)] as *u16, &str_blank_11 as far *u8);
+        put_str(POS!(10, 22), &str_blank_11 as far *u8);
     }
 }
 
@@ -98,29 +98,6 @@ far fn title_set_rect(off: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
 
 
 // ============================================================================
-// FUNCTION: Put Number (decimal)
-// ============================================================================
-
-far fn put_num(dest: *u16, value: u16, digits: u8) {
-    let d: u8 = digits;
-    let v: u16 = value;
-
-    // Write digits right-to-left
-    loop {
-        if d == 0 {
-            break;
-        }
-        d--;
-
-        let digit: u8 = mod16(v, 10) as u8;
-        v = div16(v, 10);
-
-        dest[d] = (0x30 + (digit as u16)) | TEXT_ATR;  // ASCII '0' + digit
-    }
-}
-
-
-// ============================================================================
 // FUNCTION: Title Screen
 // Returns 1 if A+B held (skip intro)
 // ============================================================================
@@ -141,13 +118,13 @@ far fn full_title_screen() -> u8 {
     title_set_rect(POS!(16, 17), 12, 3, 0x18D | BG_PAL!(5), 25);
 
     // Display text
-    put_str(&nametable1[POS!(4, 2)] as *u16, &str_score as far *u8);
-    put_str(&nametable1[POS!(17, 2)] as *u16, &str_best as far *u8);
-    put_str(&nametable1[POS!(8, 26)] as *u16, &str_copyright as far *u8);
+    put_str(POS!(4, 2), &str_score as far *u8);
+    put_str(POS!(17, 2), &str_best as far *u8);
+    put_str(POS!(8, 26), &str_copyright as far *u8);
 
     // Show scores
-    put_num(&nametable1[POS!(10, 2)] as *u16, game_score, 6);
-    put_num(&nametable1[POS!(22, 2)] as *u16, game_best_score, 6);
+    put_num(POS!(10, 2), game_score, 6);
+    put_num(POS!(22, 2), game_best_score, 6);
 
     update_nametables();
     setup_palettes();
@@ -172,12 +149,12 @@ far fn full_title_screen() -> u8 {
         // Show sound mode indicator
         if cnt != 0 {
             if global_stereo != 0 {
-                put_str(&nametable1[POS!(10, 24)] as *u16, &sound_mode_stereo as far *u8);
+                put_str(POS!(10, 24), &sound_mode_stereo as far *u8);
             } else {
-                put_str(&nametable1[POS!(10, 24)] as *u16, &sound_mode_mono as far *u8);
+                put_str(POS!(10, 24), &sound_mode_mono as far *u8);
             }
         } else {
-            put_str(&nametable1[POS!(10, 24)] as *u16, &sound_mode_blank as far *u8);
+            put_str(POS!(10, 24), &sound_mode_blank as far *u8);
         }
 
         nmi_wait();
@@ -310,19 +287,19 @@ far fn cutscene_level() {
 
     // Show height markers based on level
     if game_level >= 0 {
-        put_str(&nametable1[POS!(5, 20)] as *u16, &height_str_25 as far *u8);
+        put_str(POS!(5, 20), &height_str_25 as far *u8);
     }
     if game_level >= 1 {
-        put_str(&nametable1[POS!(5, 15)] as *u16, &height_str_50 as far *u8);
+        put_str(POS!(5, 15), &height_str_50 as far *u8);
     }
     if game_level >= 2 {
-        put_str(&nametable1[POS!(5, 10)] as *u16, &height_str_75 as far *u8);
+        put_str(POS!(5, 10), &height_str_75 as far *u8);
     }
     if game_level >= 3 {
-        put_str(&nametable1[POS!(5, 5)] as *u16, &height_str_100 as far *u8);
+        put_str(POS!(5, 5), &height_str_100 as far *u8);
     }
 
-    put_str(&nametable1[POS!(5, 25)] as *u16, &str_how_high as far *u8);
+    put_str(POS!(5, 25), &str_how_high as far *u8);
 
     update_nametables();
     setup_palettes();

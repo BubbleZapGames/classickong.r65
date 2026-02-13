@@ -20,6 +20,12 @@ static mut SCRATCH0: u8;
 #[zeropage(0x01, register)]
 static mut SCRATCH1: u8;
 
+#[zeropage(0x02, register)]
+static mut SCRATCH2: u8;
+
+#[zeropage(0x03, register)]
+static mut SCRATCH3: u8;
+
 
 // ============================================================================
 // RAM VARIABLES - Joypad State
@@ -686,6 +692,22 @@ far fn clear_nametables() {
     }
 }
 
+// Clear nametables with tile 0 (for 8bpp modes where tile $100 wraps)
+far fn clear_nametables_zero() {
+    let i: u16 = 0;
+    let zero: u16 = 0;
+
+    loop {
+        nametable1[i] = zero;
+        nametable2[i] = zero;
+        nametable3[i] = zero;
+        i++;
+        if i >= 1024 {
+            break;
+        }
+    }
+}
+
 
 // ============================================================================
 // FUNCTION: Upload Nametables to VRAM
@@ -749,9 +771,12 @@ far fn unrle(dst: *u8, src: far *u8) {
 // FUNCTION: Put Text String into Nametable
 // ============================================================================
 
-const TEXT_ATR: u16 = 0x0100;  // BG_PAL(0) | BG_PRI
+const TEXT_ATR: u16 = 0x2100;  // 0x0100 (font base) | BG_PAL(0) | BG_PRI (0x2000)
 
-far fn put_str(dst: *u16, str: far *u8) {
+far fn put_str(pos: u16, str: far *u8) {
+    // Write null-terminated string into nametable1 at POS offset.
+    // Uses direct nametable1[] access (long addressing) to avoid DBR issues.
+    let p: u16 = pos;
     loop {
         let ch: u8 = *str;
         str++;
@@ -764,8 +789,8 @@ far fn put_str(dst: *u16, str: far *u8) {
         let tile: u16 = (ch as u16) - 32;
         tile = tile | TEXT_ATR;
 
-        *dst = tile;
-        dst++;
+        nametable1[p] = tile;
+        p++;
     }
 }
 
@@ -774,15 +799,23 @@ far fn put_str(dst: *u16, str: far *u8) {
 // FUNCTION: Put Number into Nametable
 // ============================================================================
 
-far fn put_num_u16(dst: *u16, num: u16, len: u8) {
-    // This is a simplified version - full implementation needs division
-    // For now, just output the low digit
-    let digit: u16 = mod16(num, 10);
-    digit = digit + ((48 as u16) - 32) + TEXT_ATR;  // 48 = ASCII '0'
+far fn put_num(pos: u16, value: u16, digits: u8) {
+    // Write decimal number into nametable1 at POS offset, right-aligned.
+    // Uses direct nametable1[] access (long addressing) to avoid DBR issues.
+    let d: u8 = digits;
+    let v: u16 = value;
 
-    // Position at rightmost digit
-    dst = dst + (len as u16) - 1;
-    *dst = digit;
+    loop {
+        if d == 0 {
+            break;
+        }
+        d--;
+
+        let digit: u8 = mod16(v, 10) as u8;
+        v = div16(v, 10);
+
+        nametable1[pos + (d as u16)] = (0x10 + (digit as u16)) | TEXT_ATR;  // 0x10 = '0' - 32
+    }
 }
 
 
@@ -790,4 +823,4 @@ far fn put_num_u16(dst: *u16, num: u16, len: u8) {
 // FUNCTION: Calculate Nametable Position
 // ============================================================================
 
-macro_rules! POS($x:expr, $y:expr) { (($y << 5) + $x) }
+macro_rules! POS($x:expr, $y:expr) { ((($y as u16) << 5) + ($x as u16)) }

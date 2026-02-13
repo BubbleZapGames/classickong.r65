@@ -246,8 +246,8 @@ far fn show_logo() {
     set_pal_src(0xC060, DATA_BANK_4);  // bzlogo_pal at 04:C060
     set_palette(0, 256);
 
-    // Clear nametables
-    clear_nametables();
+    // Clear nametables with tile 0 (8bpp mode needs 0, not $100)
+    clear_nametables_zero();
 
     // Set up logo tiles in nametable
     // Graphics at VRAM $0800 words ($1000 bytes), BG1 base at $0000
@@ -330,11 +330,11 @@ far fn show_pal_warning() {
     oam_clear();
     clear_nametables();
 
-    put_str(&nametable1[POS!(6, 7)] as *u16, &str_pal_detected as far *u8);
-    put_str(&nametable1[POS!(1, 11)] as *u16, &str_pal_line1 as far *u8);
-    put_str(&nametable1[POS!(1, 13)] as *u16, &str_pal_line2 as far *u8);
-    put_str(&nametable1[POS!(1, 15)] as *u16, &str_pal_line3 as far *u8);
-    put_str(&nametable1[POS!(4, 19)] as *u16, &str_pal_continue as far *u8);
+    put_str(POS!(6, 7), &str_pal_detected as far *u8);
+    put_str(POS!(1, 11), &str_pal_line1 as far *u8);
+    put_str(POS!(1, 13), &str_pal_line2 as far *u8);
+    put_str(POS!(1, 15), &str_pal_line3 as far *u8);
+    put_str(POS!(4, 19), &str_pal_continue as far *u8);
 
     update_nametables();
     setup_palettes();
@@ -372,8 +372,8 @@ far fn title_screen() -> u8 {
     clear_nametables();
 
     // Display title text
-    put_str(&nametable1[POS!(8, 8)] as *u16, &str_classic_kong as far *u8);
-    put_str(&nametable1[POS!(6, 12)] as *u16, &str_press_start as far *u8);
+    put_str(POS!(8, 8), &str_classic_kong as far *u8);
+    put_str(POS!(6, 12), &str_press_start as far *u8);
 
     // Load font graphics
     dma_copy_vram_const!(0, font_gfx_data, 4096, 2048);  // 4096 = $1000
@@ -504,8 +504,8 @@ far fn draw_test_level() {
     }
 
     // Draw level indicator
-    put_str(&nametable1[POS!(2, 2)] as *u16, &str_level1_help as far *u8);
-    put_str(&nametable1[POS!(2, 4)] as *u16, &str_press_exit as far *u8);
+    put_str(POS!(2, 2), &str_level1_help as far *u8);
+    put_str(POS!(2, 4), &str_press_exit as far *u8);
 }
 
 
@@ -687,7 +687,7 @@ far fn main() -> ! {
     dma_copy_vram_const!(0, tileset1_gfx_data, 5120, 2048); // 5120 = $1400
 
     // Initialize sound system
-    spc_setup();
+    // spc_setup();  // TEMPORARILY DISABLED for VRAM comparison
 
     // Show PAL warning if needed
     if ntsc_mode == 0 {
