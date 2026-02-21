@@ -209,11 +209,11 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
     }
 
     let cnt: u8 = 0;
-    let remaining: u16 = size;
     let ptr: u16 = 0;
+    let remaining: u16 = size;
 
     loop {
-        if remaining == 0 {
+        if ptr == remaining {
             break;
         }
 
@@ -232,7 +232,6 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
 
         cnt++;
         ptr++;
-        remaining--;
     }
 
     // Set startup address (0x0200)

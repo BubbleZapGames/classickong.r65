@@ -234,6 +234,9 @@ far fn show_logo() {
     // Set mode 3 for 256-color logo
     BGMODE = BGMODE_3 | 0x08;  // Mode 3, BG3 priority
 
+    // Only enable BG1 for 256-color logo (disable BG2/sprites)
+    enable_main!(SCREEN_BG1);
+
     // Nametable setup
     BG1SC = 0 << 2;
     BG2SC = 1 << 2;
