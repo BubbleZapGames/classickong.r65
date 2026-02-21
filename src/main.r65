@@ -676,6 +676,9 @@ far fn main() -> ! {
     // Show company logo
     show_logo();
 
+    // Initialize sound system
+    spc_setup();
+
     // Fade out logo
     fade_screen(0, 0);
 
@@ -685,9 +688,6 @@ far fn main() -> ! {
     // Load shared graphics (use sneslib DMA macro)
     dma_copy_vram_const!(0, font_gfx_data, 4096, 2048);     // 4096 = $1000
     dma_copy_vram_const!(0, tileset1_gfx_data, 5120, 2048); // 5120 = $1400
-
-    // Initialize sound system
-    // spc_setup();  // TEMPORARILY DISABLED for VRAM comparison
 
     // Show PAL warning if needed
     if ntsc_mode == 0 {
