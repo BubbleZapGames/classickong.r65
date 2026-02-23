@@ -427,7 +427,277 @@ far fn set_dma_src(addr: u16, bank: u8) {
 const DATA_BANK_1: u8 = 0x01;  // font, tilesets, sprites, palettes
 const DATA_BANK_2: u8 = 0x02;  // back1_gfx
 const DATA_BANK_4: u8 = 0x04;  // title graphics, bzlogo
+const DATA_BANK_5: u8 = 0x05;  // HDMA tables, flip_table
 const RAM_BANK: u8 = 0x7E;     // Main SNES RAM ($7E0000-$7FFFFF)
+
+
+// ============================================================================
+// FUNCTION: Copy Data from VRAM to RAM via DMA
+// ============================================================================
+// Reads VRAM data back to RAM buffer using DMA channel 7.
+// Destination RAM address is set via dma_src_addr/dma_src_bank (reused as CPU-side addr).
+
+far fn copy_from_vram(vram_addr @ X: u16, size @ Y: u16) {
+    // Set VRAM address
+    VMAIN = 0x80;  // Increment after high byte
+    asm!("STX $2116");  // 16-bit store to VMADDL/VMADDH
+
+    // Dummy read to prime the VRAM read buffer (required by SNES PPU)
+    asm!(
+        "LDA $2139",       // Dummy read VMDATALREAD (primes buffer)
+        "LDA $213A"        // Dummy read VMDATAHREAD
+    );
+
+    // DMA setup: read from VRAM to CPU
+    DMAP7 = 0x81;  // direction=PPU→CPU, mode=1 (two registers)
+    BBAD7 = 0x39;  // $2139 = VMDATALREAD
+
+    // Set DMA destination (CPU-side) address from zeropage variables
+    asm!("LDA dma_src_bank", "STA $4374");   // Bank -> A1B7
+    asm!("LDA dma_src_addr", "STA $4372");   // Low byte -> A1T7L
+    asm!("LDA dma_src_addr+1", "STA $4373"); // High byte -> A1T7H
+
+    // DMA size
+    asm!("STY $4375");  // 16-bit store to DAS7L/DAS7H
+
+    MDMAEN = 0x80;
+}
+
+
+// ============================================================================
+// FUNCTION: Set WRAM Address for DMA
+// ============================================================================
+// Sets WMADDL/WMADDM/WMADDH for WRAM DMA transfers.
+
+far fn set_wram_addr(addr: u16, bank: u8) {
+    WMADDL = addr as u8;
+    WMADDM = (addr >> 8) as u8;
+    // Bank relative to $7E0000: bank $7E = 0, bank $7F = 1
+    WMADDH = bank - 0x7E;
+}
+
+
+// ============================================================================
+// FUNCTION: Copy Data from ROM/RAM to WRAM via DMA
+// ============================================================================
+// Source set via dma_src_addr/dma_src_bank, destination via set_wram_addr().
+
+far fn copy_mem(size @ Y: u16) {
+    // DMA setup: CPU→PPU, single register ($2180 = WMDATA)
+    DMAP7 = 0x00;  // direction=CPU→PPU, mode=0 (1 register)
+    BBAD7 = 0x80;  // $2180 = WMDATA
+
+    // Set DMA source address from zeropage variables
+    asm!("LDA dma_src_bank", "STA $4374");   // Bank -> A1B7
+    asm!("LDA dma_src_addr", "STA $4372");   // Low byte -> A1T7L
+    asm!("LDA dma_src_addr+1", "STA $4373"); // High byte -> A1T7H
+
+    // DMA size
+    asm!("STY $4375");  // 16-bit store to DAS7L/DAS7H
+
+    MDMAEN = 0x80;
+}
+
+
+// ============================================================================
+// FUNCTION: Set Background (composite foreground mask onto background)
+// ============================================================================
+// n: 0-3 for levels, 0xFF for clear-only (disable background)
+// Composites foreground tile masks onto background image, uploads to VRAM $4000
+// for BG2, and fills nametable2 with tile indices.
+
+far fn set_background(n: u8) {
+    // Select palette based on level
+    if n == 2 {
+        set_pal_src(&tileset1alt1_pal as u16, DATA_BANK_1);
+    } else if n == 3 {
+        set_pal_src(&tileset1alt2_pal as u16, DATA_BANK_1);
+    } else {
+        set_pal_src(&tileset1_pal as u16, DATA_BANK_1);
+    }
+    set_palette(16, 16);
+
+    // If n == 0xFF (was -1 in C), just clear VRAM and return
+    if n == 0xFF {
+        fill_vram(0x4000, 0, 24576);
+        return;
+    }
+
+    let x_off: u8 = ((n * 8) - n) & 31;
+    let tiles_all: u16;
+    if n == 0 {
+        tiles_all = 358;
+    } else {
+        tiles_all = 80;
+    }
+
+    // Copy previously uploaded front layer graphics from VRAM to RAM buffer
+    // back_buffer is at $7E_xxxx, use dma_src_addr/bank as CPU-side destination
+    set_dma_src(&back_buffer as u16, RAM_BANK);
+    copy_from_vram(0x1400, tiles_all << 5);
+
+    // Convert front layer tiles to mask in back_graphics
+    // MAKE_MASK: for each tile's 8 rows, OR the two bitplanes,
+    // extend horizontally, then invert to create an opaque mask
+    let ptr: u16 = 0;
+    let off: u16 = 0;
+    let limit: u16 = tiles_all << 4;
+
+    if game_flip == 0 {
+        // Normal (non-flipped) mask generation
+        loop {
+            if off >= limit {
+                break;
+            }
+
+            let row: u8 = 0;
+            loop {
+                let tile: u16 = back_buffer[off + (row as u16)] | back_buffer[off + 8 + (row as u16)];
+                tile = tile | (tile >> 8) | (tile << 8);
+                back_graphics[ptr] = ~tile;
+                ptr++;
+                row++;
+                if row >= 8 {
+                    break;
+                }
+            }
+
+            off = off + 16;
+        }
+    } else {
+        // Flipped mask generation (uses flip_table for bit reversal)
+        // This path uses inline asm for the flip lookup since we need
+        // byte-level table lookup that R65 can express with array indexing
+        loop {
+            if off >= limit {
+                break;
+            }
+
+            let row: u8 = 0;
+            loop {
+                let tile: u16 = back_buffer[off + (row as u16)] | back_buffer[off + 8 + (row as u16)];
+                // Flip both bytes using flip_table lookup
+                let lo: u8 = flip_table[(tile & 0xFF) as u8];
+                let hi: u8 = flip_table[(tile >> 8) as u8];
+                tile = (lo as u16) | ((hi as u16) << 8);
+                tile = tile | (tile >> 8) | (tile << 8);
+                back_graphics[ptr] = ~tile;
+                ptr++;
+                row++;
+                if row >= 8 {
+                    break;
+                }
+            }
+
+            off = off + 16;
+        }
+    }
+
+    // Copy background image from ROM to RAM buffer (back_buffer)
+    set_dma_src(&back1_gfx as u16, DATA_BANK_2);
+    set_wram_addr(&back_buffer as u16, RAM_BANK);
+    copy_mem(24576);
+
+    // Apply level graphics mask onto background
+    // For each tile in the 24-row visible area, if the tile index > 0x140,
+    // AND the corresponding mask from back_graphics onto back_buffer
+    ptr = 0;
+    off = 0;
+
+    let i: u8 = 0;
+    loop {
+        if i >= 24 {
+            break;
+        }
+
+        let x: u8 = x_off;
+        let j: u8 = 0;
+        loop {
+            if j >= 32 {
+                break;
+            }
+
+            let tile_idx: u16 = nametable1[off + (x as u16)] & 0x3FF;
+
+            if tile_idx > 0x0140 {
+                let pp: u16 = (tile_idx - 0x0140) << 3;
+
+                // Apply mask to planes 0-1 (first 8 words of tile)
+                let k: u8 = 0;
+                loop {
+                    back_buffer[ptr] = back_buffer[ptr] & back_graphics[pp + (k as u16)];
+                    ptr++;
+                    k++;
+                    if k >= 8 {
+                        break;
+                    }
+                }
+
+                // Apply same mask to planes 2-3 (next 8 words)
+                k = 0;
+                loop {
+                    back_buffer[ptr] = back_buffer[ptr] & back_graphics[pp + (k as u16)];
+                    ptr++;
+                    k++;
+                    if k >= 8 {
+                        break;
+                    }
+                }
+            } else {
+                ptr = ptr + 16;
+            }
+
+            x = (x + 1) & 31;
+            j++;
+        }
+
+        off = off + 32;
+        i++;
+    }
+
+    // Copy modified background graphics from RAM buffer to VRAM
+    set_dma_src(&back_buffer as u16, RAM_BANK);
+    copy_to_vram(0x4000, 24576);
+
+    // Set background palette (palette 7, colors 112-127)
+    set_pal_src(&back1_pal as u16, DATA_BANK_1);
+    set_palette(112, 16);
+
+    // Fill nametable2 with sequential tile indices + BG_PAL(7)
+    off = 0;
+    i = 0;
+    loop {
+        if i >= 24 {
+            break;
+        }
+
+        let x2: u8 = x_off;
+        let j2: u8 = 0;
+        loop {
+            if j2 >= 32 {
+                break;
+            }
+
+            nametable2[off + (x2 as u16)] = off + (j2 as u16) + BG_PAL!(7);
+            x2 = (x2 + 1) & 31;
+            j2++;
+        }
+
+        off = off + 32;
+        i++;
+    }
+
+    // Fill rows 24-31 with row 23 base tile + BG_PAL(7)
+    let fill_base: u16 = 23 * 32 + BG_PAL!(7);
+    off = 24 * 32;
+    loop {
+        if off >= 32 * 32 {
+            break;
+        }
+        nametable2[off] = fill_base;
+        off++;
+    }
+}
 
 
 // ============================================================================
