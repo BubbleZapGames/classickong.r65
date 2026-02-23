@@ -689,8 +689,8 @@ far fn main() -> ! {
     game_init();
 
     // Load shared graphics (use sneslib DMA macro)
-    dma_copy_vram_const!(0, font_gfx_data, 4096, 2048);     // 4096 = $1000
-    dma_copy_vram_const!(0, tileset1_gfx_data, 5120, 2048); // 5120 = $1400
+    dma_copy_vram_const!(0, font_gfx_data, 0x1000, 2048);     // 4096 = $1000
+    dma_copy_vram_const!(7, tileset1_gfx_data, 0x1400, 2048); // 5120 = $1400
 
     // Show PAL warning if needed
     if ntsc_mode == 0 {

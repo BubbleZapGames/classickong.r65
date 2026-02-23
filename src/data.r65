@@ -197,3 +197,75 @@ const MUSIC_LOSE_SIZE: u16 = 348;
 const MUSIC_TIME_OUT_SIZE: u16 = 100;
 const MUSIC_VICTORY_SIZE: u16 = 327;
 const SPC700_SIZE: u16 = 32579;
+
+
+// ============================================================================
+// FLIP TABLE (bit-reversal lookup, 256 bytes)
+// ============================================================================
+
+#[bank(5)]
+static flip_table: [u8; 256] = include_bytes!("../assets/data/flip_table.bin");
+
+
+// ============================================================================
+// HDMA GRADIENT TABLES (for color gradients via HDMA)
+// ============================================================================
+
+#[bank(5)]
+static hdma_null: [u8; 1] = include_bytes!("../assets/hdma/null.bin");
+
+// Gradient 0 - Level 1
+#[bank(5)]
+static hdma_gradient0_list0: [u8; 135] = include_bytes!("../assets/hdma/hdmaGradient0List0.bin");
+#[bank(5)]
+static hdma_gradient0_list1: [u8; 135] = include_bytes!("../assets/hdma/hdmaGradient0List1.bin");
+#[bank(5)]
+static hdma_gradient0_list2: [u8; 135] = include_bytes!("../assets/hdma/hdmaGradient0List2.bin");
+
+// Gradient 1 - Level 4
+#[bank(5)]
+static hdma_gradient1_list0: [u8; 143] = include_bytes!("../assets/hdma/hdmaGradient1List0.bin");
+#[bank(5)]
+static hdma_gradient1_list1: [u8; 143] = include_bytes!("../assets/hdma/hdmaGradient1List1.bin");
+#[bank(5)]
+static hdma_gradient1_list2: [u8; 143] = include_bytes!("../assets/hdma/hdmaGradient1List2.bin");
+
+// Gradient 2 - Level 3
+#[bank(5)]
+static hdma_gradient2_list0: [u8; 135] = include_bytes!("../assets/hdma/hdmaGradient2List0.bin");
+#[bank(5)]
+static hdma_gradient2_list1: [u8; 135] = include_bytes!("../assets/hdma/hdmaGradient2List1.bin");
+#[bank(5)]
+static hdma_gradient2_list2: [u8; 135] = include_bytes!("../assets/hdma/hdmaGradient2List2.bin");
+
+// Gradient 3 - Title screen
+#[bank(5)]
+static hdma_gradient3_list0: [u8; 139] = include_bytes!("../assets/hdma/hdmaGradient3List0.bin");
+#[bank(5)]
+static hdma_gradient3_list1: [u8; 139] = include_bytes!("../assets/hdma/hdmaGradient3List1.bin");
+#[bank(5)]
+static hdma_gradient3_list2: [u8; 139] = include_bytes!("../assets/hdma/hdmaGradient3List2.bin");
+
+// Gradient 4 - Sound test / levels clear
+#[bank(5)]
+static hdma_gradient4_list0: [u8; 139] = include_bytes!("../assets/hdma/hdmaGradient4List0.bin");
+#[bank(5)]
+static hdma_gradient4_list1: [u8; 139] = include_bytes!("../assets/hdma/hdmaGradient4List1.bin");
+#[bank(5)]
+static hdma_gradient4_list2: [u8; 139] = include_bytes!("../assets/hdma/hdmaGradient4List2.bin");
+
+// Gradient 5 - Level 2
+#[bank(5)]
+static hdma_gradient5_list0: [u8; 143] = include_bytes!("../assets/hdma/hdmaGradient5List0.bin");
+#[bank(5)]
+static hdma_gradient5_list1: [u8; 143] = include_bytes!("../assets/hdma/hdmaGradient5List1.bin");
+#[bank(5)]
+static hdma_gradient5_list2: [u8; 143] = include_bytes!("../assets/hdma/hdmaGradient5List2.bin");
+
+// Gradient 6 - How high can you get
+#[bank(5)]
+static hdma_gradient6_list0: [u8; 45] = include_bytes!("../assets/hdma/hdmaGradient6List0.bin");
+#[bank(5)]
+static hdma_gradient6_list1: [u8; 45] = include_bytes!("../assets/hdma/hdmaGradient6List1.bin");
+#[bank(5)]
+static hdma_gradient6_list2: [u8; 45] = include_bytes!("../assets/hdma/hdmaGradient6List2.bin");

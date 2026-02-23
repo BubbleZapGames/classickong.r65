@@ -56,6 +56,85 @@ static platform_anim: [u16; 14] = [
 
 
 // ============================================================================
+// FUNCTION: Setup HDMA Color Gradient
+// ============================================================================
+// n: gradient index (0-7), or 0xFF to disable HDMA only
+// C original mapping:
+//   0 = no gradient (null tables)
+//   1 = level 1 (gradient0)
+//   2 = level 2 (gradient5)
+//   3 = level 3 (gradient2)
+//   4 = level 4 (gradient1)
+//   5 = title screen (gradient3)
+//   6 = sound test / levels clear (gradient4)
+//   7 = how high can you get (gradient6)
+
+macro_rules! hdma_set_tables($l0:expr, $l1:expr, $l2:expr) {
+    asm!(
+        "LDA #<{L0}", "STA $4302",   // A1T0L
+        "LDA #>{L0}", "STA $4303",   // A1T0H
+        "LDA #:{L0}", "STA $4304",   // A1B0
+        "LDA #<{L1}", "STA $4312",   // A1T1L
+        "LDA #>{L1}", "STA $4313",   // A1T1H
+        "LDA #:{L1}", "STA $4314",   // A1B1
+        "LDA #<{L2}", "STA $4322",   // A1T2L
+        "LDA #>{L2}", "STA $4323",   // A1T2H
+        "LDA #:{L2}", "STA $4324",   // A1B2
+        L0=stringify!($l0), L1=stringify!($l1), L2=stringify!($l2)
+    );
+}
+
+far fn setup_hdma_gradient(n: u8) {
+    nmi_wait();
+    HDMAEN = 0;  // Stop HDMA
+    nmi_wait();
+
+    if n == 0xFF {
+        return;
+    }
+
+    // Set HDMA channel parameters (channels 0, 1, 2)
+    // All channels: direct mode, 1 register, target $2132 (COLDATA)
+    DMAP0 = 0x00;
+    BBAD0 = 0x32;
+    DMAP1 = 0x00;
+    BBAD1 = 0x32;
+    DMAP2 = 0x00;
+    BBAD2 = 0x32;
+
+    // Select gradient tables based on n
+    // Note: macro args use WLA-DX label names (compiler appends _data suffix)
+    if n == 0 {
+        // No gradient (null tables)
+        hdma_set_tables!(hdma_null_data, hdma_null_data, hdma_null_data);
+    } else if n == 1 {
+        // Level 1
+        hdma_set_tables!(hdma_gradient0_list0_data, hdma_gradient0_list1_data, hdma_gradient0_list2_data);
+    } else if n == 2 {
+        // Level 2
+        hdma_set_tables!(hdma_gradient5_list0_data, hdma_gradient5_list1_data, hdma_gradient5_list2_data);
+    } else if n == 3 {
+        // Level 3
+        hdma_set_tables!(hdma_gradient2_list0_data, hdma_gradient2_list1_data, hdma_gradient2_list2_data);
+    } else if n == 4 {
+        // Level 4
+        hdma_set_tables!(hdma_gradient1_list0_data, hdma_gradient1_list1_data, hdma_gradient1_list2_data);
+    } else if n == 5 {
+        // Title screen
+        hdma_set_tables!(hdma_gradient3_list0_data, hdma_gradient3_list1_data, hdma_gradient3_list2_data);
+    } else if n == 6 {
+        // Sound test / levels clear
+        hdma_set_tables!(hdma_gradient4_list0_data, hdma_gradient4_list1_data, hdma_gradient4_list2_data);
+    } else {
+        // How high can you get (n == 7)
+        hdma_set_tables!(hdma_gradient6_list0_data, hdma_gradient6_list1_data, hdma_gradient6_list2_data);
+    }
+
+    HDMAEN = 0x07;  // Enable HDMA channels 0, 1, 2
+}
+
+
+// ============================================================================
 // FUNCTION: Display Press Start Message
 // ============================================================================
 
@@ -104,6 +183,7 @@ far fn title_set_rect(off: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
 
 far fn full_title_screen() -> u8 {
     set_bright(0);
+    setup_hdma_gradient(0xFF);  // Disable HDMA before setting up graphics
     oam_clear();
 
     // Copy title graphics to VRAM (use sneslib DMA macro)
@@ -116,6 +196,9 @@ far fn full_title_screen() -> u8 {
     title_set_rect(POS!(4, 5), 13, 3, 0x180 | BG_PAL!(5), 25);
     title_set_rect(POS!(4, 8), 24, 9, 0x1CB | BG_PAL!(6), 24);
     title_set_rect(POS!(16, 17), 12, 3, 0x18D | BG_PAL!(5), 25);
+
+    // Composite foreground mask onto background, upload to VRAM $4000
+    set_background(0);
 
     // Display text
     put_str(POS!(4, 2), &str_score as far *u8);
@@ -130,13 +213,15 @@ far fn full_title_screen() -> u8 {
     setup_palettes();
     update_palette();
 
+    setup_hdma_gradient(5);  // Enable title screen color gradient
+
     let bright: u8 = 0;
     game_frame_cnt = 0;
     let cnt: u8 = 0;
     let codet: u8 = 0;
     let codeh: u8 = 0;
 
-    // TODO: music_play(MUS_TITLE);
+    music_play(MUS_TITLE);
 
     loop {
         // Blink press start message
@@ -215,8 +300,8 @@ far fn full_title_screen() -> u8 {
         }
     }
 
-    // TODO: music_stop();
-    // TODO: sfx_play(SFX_CHN+3, SFX_START, 128);
+    music_stop();
+    sfx_play(SFX_CHN + 3, SFX_START, 128);
 
     // Blink press start text
     let i: u8 = 0;
