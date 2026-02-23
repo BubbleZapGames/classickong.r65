@@ -253,23 +253,21 @@ far fn pad_read_ports() {
     let prev: u16 = joypad_state_prev[0];
 
     joypad_state[0] = current;
+    joypad_state_prev[0] = current;
 
     // Calculate trigger (new presses)
     let trigger: u16 = (current ^ prev) & current;
     joypad_state_trigger[0] = trigger;
-
-    joypad_state_prev[0] = current;
 
     // Read joypad 2
     let current2: u16 = (JOY2H as u16) << 8 | (JOY2L as u16);
     let prev2: u16 = joypad_state_prev[1];
 
     joypad_state[1] = current2;
+    joypad_state_prev[1] = current2;
 
     let trigger2: u16 = (current2 ^ prev2) & current2;
     joypad_state_trigger[1] = trigger2;
-
-    joypad_state_prev[1] = current2;
 }
 
 
@@ -278,7 +276,7 @@ far fn pad_read_ports() {
 // ============================================================================
 
 far fn pad_poll(joy: u16) -> u16 {
-    return joypad_state[X];
+    return joypad_state[joy];
 }
 
 
@@ -287,7 +285,7 @@ far fn pad_poll(joy: u16) -> u16 {
 // ============================================================================
 
 far fn pad_poll_trigger(joy: u16) -> u16 {
-    return joypad_state_trigger[X];
+    return joypad_state_trigger[joy];
 }
 
 
