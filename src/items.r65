@@ -162,53 +162,52 @@ far fn particle_add(ptype: u8, px: u8, py: u8) {
     let cnt2: u8 = 0;
     let spr: u16 = 0;
 
+    // Find free particle slot
     loop {
-        if particle_type[i] != PART_TYPE_NONE {
-            i++;
-            if i >= PARTICLES_MAX {
-                i = 0;
-            }
-            j++;
-            if j >= PARTICLES_MAX {
-                return;  // No room
-            }
-            continue;
+        if particle_type[i] == PART_TYPE_NONE {
+            break;
         }
-
-        particle_type[i] = ptype;
-        particle_x[i] = px;
-        particle_y[i] = py;
-
-        if ptype == PART_TYPE_100 {
-            cnt1 = 50;
-            spr = ITEMS_TILE + 0x20 | ITEM_ATR;
-        } else if ptype == PART_TYPE_300 {
-            cnt1 = 50;
-            spr = ITEMS_TILE + 0x0A | ITEM_ATR;
-        } else if ptype == PART_TYPE_500 {
-            cnt1 = 50;
-            spr = ITEMS_TILE + 0x0C | ITEM_ATR;
-        } else if ptype == PART_TYPE_800 {
-            cnt1 = 50;
-            spr = ITEMS_TILE + 0x0E | ITEM_ATR;
-        } else if ptype == PART_TYPE_HELP {
-            cnt1 = 32;
-            spr = PRINCESS_TILE + 0x08 | PRINCESS_ATR;
-        } else if ptype == PART_TYPE_SMOKE || ptype == PART_TYPE_SMOKE_UP {
-            cnt1 = 32;
-            spr = ENEMY_TILE + 0x40 | ENEMY_ATR;
-        } else if ptype == PART_TYPE_HEART {
-            cnt1 = 8;
-            cnt2 = 64;
-            spr = PRINCESS_TILE + 0x0C | PRINCESS_ATR;
+        i++;
+        if i >= PARTICLES_MAX {
+            i = 0;
         }
-
-        particle_cnt1[i] = cnt1;
-        particle_cnt2[i] = cnt2;
-        particle_spr[i] = spr;
-
-        break;
+        j++;
+        if j >= PARTICLES_MAX {
+            return;  // No room
+        }
     }
+
+    particle_type[i] = ptype;
+    particle_x[i] = px;
+    particle_y[i] = py;
+
+    if ptype == PART_TYPE_100 {
+        cnt1 = 50;
+        spr = ITEMS_TILE + 0x20 | ITEM_ATR;
+    } else if ptype == PART_TYPE_300 {
+        cnt1 = 50;
+        spr = ITEMS_TILE + 0x0A | ITEM_ATR;
+    } else if ptype == PART_TYPE_500 {
+        cnt1 = 50;
+        spr = ITEMS_TILE + 0x0C | ITEM_ATR;
+    } else if ptype == PART_TYPE_800 {
+        cnt1 = 50;
+        spr = ITEMS_TILE + 0x0E | ITEM_ATR;
+    } else if ptype == PART_TYPE_HELP {
+        cnt1 = 32;
+        spr = PRINCESS_TILE + 0x08 | PRINCESS_ATR;
+    } else if ptype == PART_TYPE_SMOKE || ptype == PART_TYPE_SMOKE_UP {
+        cnt1 = 32;
+        spr = ENEMY_TILE + 0x40 | ENEMY_ATR;
+    } else if ptype == PART_TYPE_HEART {
+        cnt1 = 8;
+        cnt2 = 64;
+        spr = PRINCESS_TILE + 0x0C | PRINCESS_ATR;
+    }
+
+    particle_cnt1[i] = cnt1;
+    particle_cnt2[i] = cnt2;
+    particle_spr[i] = spr;
 
     particle_free++;
     if particle_free >= PARTICLES_MAX {
@@ -230,15 +229,8 @@ far fn particle_process() {
         let ptype: u8 = particle_type[i];
 
         if ptype == PART_TYPE_NONE {
-            spr = spr + 4;
-            i++;
-            if i >= PARTICLES_MAX {
-                break;
-            }
-            continue;
-        }
-
-        if ptype == PART_TYPE_100 || ptype == PART_TYPE_300 ||
+            oam_spr1(0, 240, 0, spr);
+        } else if ptype == PART_TYPE_100 || ptype == PART_TYPE_300 ||
            ptype == PART_TYPE_500 || ptype == PART_TYPE_800 {
             // Score particles rise slowly
             oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
@@ -404,13 +396,7 @@ far fn items_check_collision() -> u8 {
     loop {
         let itype: u8 = item_type[i];
 
-        if itype == ITEM_NONE || itype == ITEM_ELEVATOR {
-            i++;
-            if i >= items_all {
-                break;
-            }
-            continue;
-        }
+        if itype != ITEM_NONE && itype != ITEM_ELEVATOR {
 
         if itype == ITEM_HAMMER {
             // Check if player touches hammer
@@ -423,8 +409,8 @@ far fn items_check_collision() -> u8 {
                             anim = TRUE;
 
                             player_hammer_time = 600;  // 10 seconds at 60fps
-                            // TODO: sfx_play(SFX_CHN, SFX_HAMMER, item_x[i]);
-                            // TODO: music_play(MUSIC_HAMMER);
+                            sfx_play(SFX_CHN + 3, SFX_ITEM, player_x + 8);
+                            music_play(MUS_HAMMER);
                         }
                     }
                 }
@@ -450,18 +436,20 @@ far fn items_check_collision() -> u8 {
                                 particle = PART_TYPE_800;
                             }
 
-                            // TODO: game_add_score(score);
+                            game_add_score(score);
                             particle_add(particle, item_x[i], item_y[i]);
 
                             item_type[i] = ITEM_NONE;
                             anim = TRUE;
 
-                            // TODO: sfx_play(SFX_CHN+1, SFX_ITEM, item_x[i]);
+                            sfx_play(SFX_CHN + 3, SFX_ITEM, player_x + 8);
                         }
                     }
                 }
             }
         }
+
+        } // end if itype != NONE && != ELEVATOR
 
         i++;
         if i >= items_all {

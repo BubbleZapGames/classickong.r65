@@ -43,7 +43,7 @@ far fn hw_init_ppu() {
     set_bg4_vscroll!(0);
 
     // VRAM access
-    VMAIN = VMAIN_INCREMENT_HIGH;
+    VMAIN = VmainTrigger::High as u8;
     VMADDL = 0;
     VMADDH = 0;
 
@@ -77,8 +77,8 @@ far fn hw_init_ppu() {
     WOBJLOG = 0;
 
     // Screen layer enables (use sneslib macros)
-    enable_main!(SCREEN_BG1);
-    enable_sub!(0);
+    set_main_layers!(Screen::BG1);
+    set_sub_layers!(0);
     TMW = 0;
     TSW = 0;
 
@@ -115,7 +115,7 @@ far fn hw_init_cpu() {
 
     // Disable DMA and HDMA (use sneslib macro for HDMA)
     MDMAEN = 0;
-    disable_hdma!();
+    //disable_hdma!();
 
     // FastROM - original doesn't enable during init (game_init does it later)
     MEMSEL = 0;

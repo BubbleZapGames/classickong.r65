@@ -4,7 +4,7 @@
 // Handles title screen, intro, level start, and level clear cutscenes
 // ============================================================================
 
-#[bank(0)]
+#[bank(7)]
 
 // ============================================================================
 // CUTSCENE VARIABLES
@@ -36,22 +36,31 @@ static str_best: [u8; 12] = "BEST:000000";
 static str_copyright: [u8; 16] = "@2012 BUBBLEZAP";
 static str_how_high: [u8; 23] = "HOW HIGH CAN YOU GET ?";
 
-// Platform bending animation tiles
-static platform_anim: [u16; 14] = [
-    0x0140 | BG_PAL!(1),  // Frame 0 top
-    0x0140 | BG_PAL!(1),  // Frame 0 bottom
-    0x0145 | BG_PAL!(1),  // Frame 1 top
-    0x0145 | BG_PAL!(1),  // Frame 1 bottom
-    0x0145 | BG_PAL!(1),  // Frame 2 top
-    0x0145 | BG_PAL!(1),  // Frame 2 bottom
-    0x0145 | BG_PAL!(1),  // Frame 3 top
-    0x0145 | BG_PAL!(1),  // Frame 3 bottom
-    0x0145 | BG_PAL!(1),  // Frame 4 top
-    0x0145 | BG_PAL!(1),  // Frame 4 bottom
-    0x0145 | BG_PAL!(1),  // Frame 5 top
-    0x0145 | BG_PAL!(1),  // Frame 5 bottom
-    0x0145 | BG_PAL!(1),  // Frame 6 top
-    0x0145 | BG_PAL!(1)   // Frame 6 bottom
+// Sound test strings
+static str_sound_test: [u8; 11] = "SOUND TEST";
+static str_sound: [u8; 6] = "SOUND";
+static str_pan: [u8; 4] = "PAN";
+static str_music: [u8; 6] = "MUSIC";
+static str_volume: [u8; 7] = "VOLUME";
+static str_exit: [u8; 5] = "EXIT";
+static str_version: [u8; 6] = "V2.01";
+static str_ntsc: [u8; 5] = "NTSC";
+static str_pal: [u8; 5] = " PAL";
+
+// Sound test constants
+const SOUNDS_ALL: u8 = 33;
+const MUSIC_ALL: u8 = 9;
+
+// Platform bending animation tiles (top, bottom pairs for each stage)
+static platform_anim: [u16; 16] = [
+    0x0149 | BG_PAL!(1), 0x0159 | BG_PAL!(1),
+    0x014A | BG_PAL!(1), 0x015A | BG_PAL!(1),
+    0x014B | BG_PAL!(1), 0x015B | BG_PAL!(1),
+    0x014C | BG_PAL!(1), 0x015C | BG_PAL!(1),
+    0x014D | BG_PAL!(1), 0x015D | BG_PAL!(1),
+    0x014E | BG_PAL!(1), 0x015E | BG_PAL!(1),
+    0x014F | BG_PAL!(1), 0x015F | BG_PAL!(1),
+    0x0148 | BG_PAL!(1), 0x0158 | BG_PAL!(1)
 ];
 
 
@@ -126,7 +135,7 @@ far fn setup_hdma_gradient(n: u8) {
         // Sound test / levels clear
         hdma_set_tables!(hdma_gradient4_list0_data, hdma_gradient4_list1_data, hdma_gradient4_list2_data);
     } else {
-        // How high can you get (n == 7)
+        // How high can you get (n >= 7)
         hdma_set_tables!(hdma_gradient6_list0_data, hdma_gradient6_list1_data, hdma_gradient6_list2_data);
     }
 
@@ -206,8 +215,8 @@ far fn full_title_screen() -> u8 {
     put_str(POS!(8, 26), &str_copyright as far *u8);
 
     // Show scores
-    put_num(POS!(10, 2), game_score, 6);
-    put_num(POS!(22, 2), game_best_score, 6);
+    put_score(POS!(10, 2), &game_score);
+    put_score(POS!(22, 2), &game_best_score);
 
     update_nametables();
     setup_palettes();
@@ -264,8 +273,8 @@ far fn full_title_screen() -> u8 {
         // Select changes stereo mode
         if (trig & PAD_SELECT) != 0 {
             global_stereo = global_stereo ^ 1;
-            // TODO: spc_stereo(global_stereo);
-            // TODO: sfx_play(SFX_CHN+2, SFX_ITEM, 128);
+            spc_stereo(global_stereo);
+            sfx_play(SFX_CHN+2, SFX_ITEM, 128);
             cnt = 60;
         }
 
@@ -274,7 +283,7 @@ far fn full_title_screen() -> u8 {
             if test_code[codet] == trig {
                 codet++;
                 if codet == 6 {
-                    // TODO: sfx_play(SFX_CHN+2, SFX_LOVE, 128);
+                    sfx_play(SFX_CHN+2, SFX_LOVE, 128);
                     game_test_mode = game_test_mode ^ TRUE;
                     codet = 0;
                 }
@@ -286,7 +295,7 @@ far fn full_title_screen() -> u8 {
             if hard_code[codeh] == trig {
                 codeh++;
                 if codeh == 8 {
-                    // TODO: sfx_play(SFX_CHN+2, SFX_KONG_LAUGH, 128);
+                    sfx_play(SFX_CHN+2, SFX_KONG_LAUGH, 128);
                     game_hard_mode = game_hard_mode ^ TRUE;
                     codeh = 0;
                 }
@@ -355,10 +364,15 @@ static mut stack_delay: [u8; 4];
 
 far fn cutscene_level() {
     set_bright(0);
+    setup_hdma_gradient(0xFF);
     oam_clear();
+
+    // BG1 and BG2 character base both at $0000 (cutscene uses shared tileset)
+    BG12NBA = 0x00;
 
     setup_ingame_graphics();
     clear_nametables();
+    set_background(0xFF);  // Clear BG2 VRAM area
 
     // Fill background with pattern
     let ptr: u16 = 0;
@@ -403,14 +417,16 @@ far fn cutscene_level() {
     let bright: u8 = 0;
     let delay_cnt: u8 = 25;
 
-    // TODO: setup_hdma_gradient(7);
-    // TODO: spc_volume(global_volume);
+    setup_hdma_gradient(7);
+    spc_volume(global_volume);
 
     // Simple animation: Kong drops in from above
     // Initialize local arrays (using static storage for array data)
     // Note: Compiler doesn't support stack-allocated arrays with initializers
-    stack_y[0] = -512; stack_y[1] = -512; stack_y[2] = -512; stack_y[3] = -512;
-    stack_ty[0] = 160; stack_ty[1] = 120; stack_ty[2] = 80; stack_ty[3] = 40;
+    // Fixed-point 10.6 format (multiply pixel values by 64)
+    // C original: y = (64+40*2)<<6 = 9216, stack_y = -32<<6 = -2048
+    stack_y[0] = -2048; stack_y[1] = -2048; stack_y[2] = -2048; stack_y[3] = -2048;
+    stack_ty[0] = 9216; stack_ty[1] = 6656; stack_ty[2] = 4096; stack_ty[3] = 1536;
     stack_dy[0] = 0; stack_dy[1] = 0; stack_dy[2] = 0; stack_dy[3] = 0;
     stack_frame[0] = 0; stack_frame[1] = 0; stack_frame[2] = 0; stack_frame[3] = 0;
     stack_jump[0] = 0; stack_jump[1] = 0; stack_jump[2] = 0; stack_jump[3] = 0;
@@ -435,21 +451,23 @@ far fn cutscene_level() {
 
             if stack_delay[j] != 0 {
                 stack_delay[j]--;
-                j++;
-                continue;
-            }
+            } else {
 
             if stack_jump[j] < 4 {
                 stack_y[j] = stack_y[j] + stack_dy[j];
 
-                if stack_dy[j] < 64 {
+                if stack_dy[j] < 256 {  // 4 << 6 = 256 in fixed-point
                     stack_dy[j] = stack_dy[j] + 6;
                 }
 
                 if stack_y[j] >= stack_ty[j] {
                     stack_y[j] = stack_ty[j];
-                    // Bounce: reverse velocity and dampen by 1/3
-                    stack_dy[j] = 0 - (div8(stack_dy[j] as u8, 3) as i16);
+                    // Bounce: reverse velocity, dampened
+                    // C: stack_dy = 0 - ((stack_dy << 6) / 160)
+                    // Simplify: dy / 2.5 ≈ (dy << 6) / 160 ≈ dy * 2 / 5
+                    // Use shift approximation: dy >> 1 - dy >> 3 ≈ dy * 0.375
+                    let damp: i16 = (stack_dy[j] >> 1) - (stack_dy[j] >> 3);
+                    stack_dy[j] = 0 - damp;
                     stack_jump[j]++;
                 }
             }
@@ -466,13 +484,15 @@ far fn cutscene_level() {
             kong_frame_idx = kong_anim_both[3 - stack_frame[j]];
             game_show_kong((j as u16) << 4, 112, stack_y[j] >> 6);
 
+            } // end else (stack_delay == 0)
+
             j++;
         }
 
         if delay_cnt != 0 {
             delay_cnt--;
             if delay_cnt == 0 {
-                // TODO: music_play(MUS_STAGE_START);
+                music_play(MUS_STAGE_START);
             }
         }
 
@@ -488,6 +508,103 @@ far fn cutscene_level() {
 
 
 // ============================================================================
+// FUNCTION: Update Platform Bending Animation
+// ============================================================================
+// Bends platforms progressively during intro cutscene jumps.
+// off: platform row (0-5), ptr: nametable position, wdt: width, dx: direction (-1 or 1)
+
+far fn cutscene_update_platform(off: u16, ptr: u16, wdt: u8, dx: i8) {
+    let idx: u16 = off << 5;
+    let pos: u16 = ptr;
+    let cnt: u8 = 0;
+    let hgt: u8 = 1;
+
+    let i: u8 = 0;
+    loop {
+        if i >= wdt {
+            break;
+        }
+
+        let j: u8 = platform_anim_cnt[idx];
+        if j < hgt {
+            let k: u16 = (j as u16) << 1;
+            nametable1[pos] = platform_anim[k];
+            nametable1[pos + 32] = platform_anim[k + 1];
+            platform_anim_cnt[idx]++;
+        }
+
+        pos = (pos as i16 + (dx as i16)) as u16;
+        idx++;
+        cnt++;
+
+        if cnt == 3 {
+            cnt = 0;
+            if hgt < 7 {
+                hgt++;
+            }
+        }
+
+        i++;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Show Falling Ladders (Intro Cutscene)
+// ============================================================================
+
+far fn cutscene_intro_show_ladders() {
+    let i: u16 = 0;
+    loop {
+        if i >= (LADDERS_MAX as u16) {
+            break;
+        }
+
+        if ladders_y[i] < 240 {
+            oam_spr1(ladders_x[i], ladders_y[i],
+                     ENEMY_TILE + 0x0E | ENEMY_ATR,
+                     (127 - i) << 2);
+
+            if ladders_delay[i] != 0 {
+                ladders_delay[i]--;
+            } else {
+                ladders_y[i] = ladders_y[i] + 2;
+            }
+        }
+
+        i++;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Update Princess Position Relative to Kong (Intro/Next Level)
+// ============================================================================
+// off: x offset from kong, hold: 1=held by kong, shift: 1=float upward when released
+
+far fn cutscene_intro_princess_hold(off: u8, hold: u8, shift: u8) -> u8 {
+    if hold != 0 {
+        princess_x = kong_x + off;
+        if (game_frame_cnt & 8) != 0 {
+            princess_y = kong_y as u8;
+        } else {
+            princess_y = (kong_y - 1) as u8;
+        }
+        return 0;
+    }
+
+    if shift != 0 && (game_frame_cnt & 3) == 0 && princess_y > 3 {
+        princess_y--;
+    }
+
+    if (game_frame_cnt & 32) != 0 {
+        return 2;
+    }
+    return 0;
+}
+
+
+// ============================================================================
 // FUNCTION: Intro Cutscene (Kong climbs with princess)
 // ============================================================================
 
@@ -495,13 +612,15 @@ far fn cutscene_intro() {
     game_flip = 0;
 
     set_bright(0);
+    setup_hdma_gradient(0xFF);
     oam_clear();
 
     setup_ingame_graphics();
     clear_nametables();
+    set_background(0xFF);
 
     // Load intro map
-    unrle(&map as *u8, &mapi_data as far *u8);
+    unrle(&mapi_data as *u8 as u16, DATA_BANK_1);
 
     // Copy map to nametable
     let ptr: u16 = 0;
@@ -527,16 +646,49 @@ far fn cutscene_intro() {
         }
     }
 
-    // TODO: music_play(MUS_GAME_START);
+    // Clear platform animation counters
+    i = 0;
+    loop {
+        platform_anim_cnt[i] = 0;
+        i++;
+        if i >= 192 {
+            break;
+        }
+    }
 
-    kong_x = 115;
+    music_play(MUS_GAME_START);
+
+    // Initialize falling ladder fragments
+    let y: u8 = 216;  // 224 - 8
+    i = 0;
+    loop {
+        if (i & 1) == 0 {
+            ladders_x[i] = 118;
+        } else {
+            ladders_x[i] = 130;
+        }
+        ladders_y[i] = y;
+        ladders_delay[i] = 50 + ((i as u8) << 3) + (rand() & 15) as u8;
+
+        if (i & 1) != 0 {
+            y = y - 16;
+        }
+        i++;
+        if i >= (LADDERS_MAX as u16) {
+            break;
+        }
+    }
+
+    cutscene_intro_show_ladders();
+
+    kong_x = 115;   // 128 - 16 + 3
     kong_y = 240;
-    princess_x = kong_x + 20;
-    princess_y = (kong_y - 8) as u8;
 
     let bright: u8 = 0;
+    let princess_frame: u8 = 0;
+    let xp_off: u8 = 20;
 
-    // Kong climbs up
+    // ---- Kong climbs up ----
     loop {
         if kong_y <= 40 {
             break;
@@ -551,24 +703,26 @@ far fn cutscene_intro() {
 
         // Climbing animation
         if (game_frame_cnt & 8) != 0 {
-            kong_frame_idx = KONG_ANIM_FACE2_RIGHT;
+            kong_frame_idx = KONG_ANIM_CLIMB1_RIGHT;
         } else {
-            kong_frame_idx = KONG_ANIM_FACE3_RIGHT;
+            kong_frame_idx = KONG_ANIM_CLIMB2_RIGHT;
         }
 
         kong_y--;
-        princess_x = kong_x + 20;
-        princess_y = (kong_y as i16 - 8) as u8;
+
+        princess_frame = cutscene_intro_princess_hold(xp_off, TRUE, TRUE);
 
         game_show_kong(OAM_KONG, kong_x, kong_y);
-        game_show_princess(0);
+        game_show_princess(princess_frame);
+
+        cutscene_intro_show_ladders();
 
         game_frame_cnt++;
     }
 
-    // Kong jumps and releases princess
+    // ---- Kong jumps and releases princess ----
     let ky: i16 = (kong_y as i16) << 6;
-    let kdy: i16 = -64;
+    let kdy: i16 = -64;   // -1 << 6
     let hold: u8 = TRUE;
 
     loop {
@@ -586,19 +740,11 @@ far fn cutscene_intro() {
             hold = FALSE;
         }
 
-        if hold != 0 {
-            princess_x = kong_x + 20;
-            princess_y = (kong_y as i16 - 8) as u8;
-        } else {
-            // Princess stays at top
-            if princess_y > 3 && (game_frame_cnt & 3) == 0 {
-                princess_y--;
-            }
-        }
+        princess_frame = cutscene_intro_princess_hold(xp_off, hold, TRUE);
 
-        kong_frame_idx = KONG_ANIM_FACE1;
         game_show_kong(OAM_KONG, kong_x, kong_y);
-        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+        game_show_princess(princess_frame);
+        cutscene_intro_show_ladders();
 
         game_frame_cnt++;
 
@@ -608,74 +754,113 @@ far fn cutscene_intro() {
         }
     }
 
-    // Kong jumps to position (simplified)
+    // ---- Kong jumps to position, platforms bend ----
     kong_frame_idx = KONG_ANIM_FACE4_BOTH;
+    kdy = -64;   // -1 << 6
     let jump_cnt: u8 = 0;
+    let frame: u16 = 0;
 
     loop {
         nmi_wait();
-        update_nametables();
+
+        // Copy nametable to VRAM (platform bending updates nametable1)
+        set_dma_src(&nametable1 as u16, RAM_BANK);
+        copy_to_vram(0x0000, 2048);
 
         if bright < 15 {
             bright++;
             set_bright(bright);
         }
 
+        // Bend platforms on odd frames
+        if (game_frame_cnt & 1) != 0 {
+            if jump_cnt == 6 { cutscene_update_platform(0, POS!(27, 25), 27, -1); }
+            if jump_cnt == 5 { cutscene_update_platform(1, POS!(4, 21), 24, 1); }
+            if jump_cnt == 4 { cutscene_update_platform(2, POS!(27, 18), 24, -1); }
+            if jump_cnt == 3 { cutscene_update_platform(3, POS!(4, 14), 24, 1); }
+            if jump_cnt == 2 { cutscene_update_platform(4, POS!(27, 10), 24, -1); }
+            if jump_cnt == 1 { cutscene_update_platform(5, POS!(19, 7), 9, 1); }
+        }
+
+        cutscene_intro_show_ladders();
+
         if jump_cnt < 6 {
-            let target_x: u8 = 36;
-            if kong_x > target_x {
-                kong_x--;
-            }
-
-            // Simple jump physics
-            ky = ky + kdy;
-            kdy = kdy + 4;
-
             kong_y = ky >> 6;
             if kong_y >= 24 {
                 kong_y = 24;
+            }
+
+            ky = ky + kdy;
+            kdy = kdy + 4;
+
+            // Move kong left every other frame
+            if (game_frame_cnt & 1) == 0 {
+                kong_x--;
             }
 
             if ky >= (24 << 6) {
                 ky = 24 << 6;
                 kdy = -64;
                 jump_cnt++;
-                // TODO: sfx_play(SFX_CHN+1, SFX_KONG_RIGHT, kong_x+16);
+                sfx_play(SFX_CHN + 1, SFX_KONG_RIGHT, kong_x + 16);
             }
         }
 
+        // Princess animates independently
+        if (game_frame_cnt & 32) != 0 {
+            princess_frame = 2;
+        } else {
+            princess_frame = 0;
+        }
+
         game_show_kong(OAM_KONG, kong_x, kong_y);
-        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+        game_show_princess(princess_frame);
 
         game_frame_cnt++;
 
         if jump_cnt >= 6 {
-            break;
+            // Post-jump animation: kong settles into position
+            let j: u8 = (frame >> 2) as u8;
+            if j > 3 { j = 3; }
+
+            kong_frame_idx = kong_anim_both[3 - (j as u16)];
+
+            frame++;
+            if frame >= 48 {
+                break;
+            }
         }
     }
 
-    // Kong laugh
-    let laugh_cnt: u8 = 0;
+    // ---- Kong laugh ----
+    i = 0;
     loop {
+        if i >= 80 {
+            break;
+        }
+
         nmi_wait();
 
-        if (laugh_cnt & 15) == 0 {
-            // TODO: sfx_play(SFX_CHN+1, SFX_KONG_LAUGH, kong_x+16);
+        if (i & 15) == 0 {
+            sfx_play(SFX_CHN + 1, SFX_KONG_LAUGH, kong_x + 16);
             kong_frame_idx = KONG_ANIM_LAUGH;
         }
 
-        if (laugh_cnt & 15) == 8 {
+        if (i & 15) == 8 {
             kong_frame_idx = KONG_ANIM_FACE1;
         }
 
+        if (game_frame_cnt & 32) != 0 {
+            princess_frame = 2;
+        } else {
+            princess_frame = 0;
+        }
+
         game_show_kong(OAM_KONG, kong_x, kong_y);
-        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+        game_show_princess(princess_frame);
 
         game_frame_cnt++;
-        laugh_cnt++;
-        if laugh_cnt >= 80 {
-            break;
-        }
+        i++;
     }
 
     delay(25);
@@ -697,7 +882,7 @@ far fn cutscene_levels_clear() {
     clear_nametables();
 
     // Load ending map
-    unrle(&map as *u8, &mape_data as far *u8);
+    unrle(&mape_data as *u8 as u16, DATA_BANK_1);
 
     // Copy map to nametable
     let ptr: u16 = 0;
@@ -737,7 +922,7 @@ far fn cutscene_levels_clear() {
         }
     }
 
-    // TODO: spc_volume(global_volume);
+    spc_volume(global_volume);
 
     let frame: u16 = 0;
     let fall_start: u8 = FALSE;
@@ -761,7 +946,7 @@ far fn cutscene_levels_clear() {
             // Kong falling sequence (simplified)
             if fall_start == FALSE {
                 fall_start = TRUE;
-                // TODO: sfx_play(SFX_CHN+2, SFX_KONG_FALLS, 128);
+                sfx_play(SFX_CHN+2, SFX_KONG_FALLS, 128);
             }
 
             ky = ky + kdy;
@@ -775,7 +960,7 @@ far fn cutscene_levels_clear() {
 
                 if fall_ground == FALSE {
                     fall_ground = TRUE;
-                    // TODO: sfx_play(SFX_CHN+2, SFX_KONG_LANDS, 128);
+                    sfx_play(SFX_CHN+2, SFX_KONG_LANDS, 128);
                 }
             }
 
@@ -793,7 +978,7 @@ far fn cutscene_levels_clear() {
 
         // Start victory music
         if frame == 350 {
-            // TODO: music_play(MUS_VICTORY);
+            music_play(MUS_VICTORY);
         }
 
         // Mario and princess walk toward each other
@@ -811,7 +996,7 @@ far fn cutscene_levels_clear() {
         // Heart appears
         if frame == 670 {
             particle_add(PART_TYPE_HEART, 120, 32);
-            // TODO: sfx_play(SFX_CHN+3, SFX_LOVE, 128);
+            sfx_play(SFX_CHN+3, SFX_LOVE, 128);
         }
 
         // Final walk together
@@ -839,7 +1024,7 @@ far fn cutscene_levels_clear() {
 
 far fn cutscene_next_level() {
     // Show heart
-    // TODO: sfx_play(SFX_CHN, SFX_HEART, player_x);
+    sfx_play(SFX_CHN, SFX_HEART, player_x);
 
     let heart_x: u8;
     if princess_x < player_x {
@@ -937,7 +1122,202 @@ far fn cutscene_next_level() {
     delay(16);
 
     oam_spr(heart_x as u16, heart_y as i16, PLAYER_TILE + 0x4C | PLAYER_ATR, OAM_PARTICLES);
-    // TODO: sfx_play(SFX_CHN, SFX_CRACK, heart_x);
+    sfx_play(SFX_CHN, SFX_CRACK, heart_x);
 
     delay(80);
+}
+
+
+// ============================================================================
+// FUNCTION: Sound Test Screen
+// ============================================================================
+
+far fn sound_test() {
+    set_bright(0);
+    setup_hdma_gradient(0xFF);  // Disable HDMA
+    oam_clear();
+
+    clear_nametables();
+
+    // Unpack background map (same as cutscene_levels_clear)
+    unrle(&mape_data as *u8 as u16, DATA_BANK_1);
+
+    let i: u16 = 0;
+    loop {
+        nametable1[i] = (map[i] as u16) + 0x0140 | BG_PAL!(1) | BG_PRI;
+        i++;
+        if i >= 1024 {
+            break;
+        }
+    }
+
+    set_background(1);
+
+    // Draw labels
+    put_str(POS!(11, 8), &str_sound_test as far *u8);
+    put_str(POS!(11, 10), &str_sound as far *u8);
+    put_str(POS!(11, 11), &str_pan as far *u8);
+    put_str(POS!(11, 12), &str_music as far *u8);
+    put_str(POS!(11, 13), &str_volume as far *u8);
+    put_str(POS!(11, 14), &str_exit as far *u8);
+
+    // Version and system type
+    put_str(POS!(11, 17), &str_version as far *u8);
+    if ntsc_mode != 0 {
+        put_str(POS!(17, 17), &str_ntsc as far *u8);
+    } else {
+        put_str(POS!(17, 17), &str_pal as far *u8);
+    }
+
+    update_nametables();
+    setup_palettes();
+    update_palette();
+
+    setup_hdma_gradient(5);
+
+    global_volume = 120;
+    spc_volume(global_volume);
+
+    let sound: u8 = 0;
+    let pan: u8 = 0x80;
+    let music: u8 = 0;
+    let bright: u8 = 0;
+    let cur: u8 = 0;
+    let done: u8 = FALSE;
+
+    loop {
+        if done != FALSE {
+            break;
+        }
+
+        // Display current values
+        put_num(POS!(19, 10), sound as u16, 2);
+        put_num(POS!(18, 11), pan as u16, 3);
+        put_num(POS!(19, 12), music as u16, 2);
+        put_num(POS!(18, 13), global_volume as u16, 3);
+
+        // Draw cursor
+        let off: u16 = POS!(9, 10);
+        let row: u8 = 0;
+        loop {
+            if row == cur {
+                nametable1[off] = TEXT_ATR | (0x40 - 32) as u16;  // '@' - 32 = 0x20
+            } else {
+                nametable1[off] = TEXT_ATR;
+            }
+            off = off + 0x20;  // Next row = +32
+            row++;
+            if row >= 5 {
+                break;
+            }
+        }
+
+        nmi_wait();
+        update_nametables();
+
+        if bright < 15 {
+            bright++;
+            set_bright(bright);
+        }
+
+        pad_read_ports();
+        let trig: u16 = pad_poll_trigger(0);
+
+        // Navigate menu
+        if (trig & PAD_UP) != 0 {
+            if cur == 0 {
+                cur = 4;
+            } else {
+                cur--;
+            }
+        }
+
+        if (trig & PAD_DOWN) != 0 {
+            cur++;
+            if cur > 4 {
+                cur = 0;
+            }
+        }
+
+        // Decrease values
+        if (trig & PAD_LEFT) != 0 {
+            if cur == 0 {
+                if sound == 0 {
+                    sound = SOUNDS_ALL - 1;
+                } else {
+                    sound--;
+                }
+            } else if cur == 1 {
+                if pan < 0x10 {
+                    pan = 0;
+                } else {
+                    pan = pan - 0x10;
+                }
+            } else if cur == 2 {
+                if music == 0 {
+                    music = MUSIC_ALL - 1;
+                } else {
+                    music--;
+                }
+            } else if cur == 3 {
+                if global_volume < 0x08 {
+                    global_volume = 0;
+                } else {
+                    global_volume = global_volume - 0x08;
+                }
+                spc_volume(global_volume);
+            }
+        }
+
+        // Increase values
+        if (trig & PAD_RIGHT) != 0 {
+            if cur == 0 {
+                sound++;
+                if sound >= SOUNDS_ALL {
+                    sound = 0;
+                }
+            } else if cur == 1 {
+                if pan > 0xE0 {
+                    pan = 0xF0;
+                } else {
+                    pan = pan + 0x10;
+                }
+            } else if cur == 2 {
+                music++;
+                if music >= MUSIC_ALL {
+                    music = 0;
+                }
+            } else if cur == 3 {
+                if global_volume > 0x70 {
+                    global_volume = 0x78;
+                } else {
+                    global_volume = global_volume + 0x08;
+                }
+                spc_volume(global_volume);
+            }
+        }
+
+        // Play sound/music
+        if (trig & PAD_A) != 0 {
+            if cur == 0 || cur == 1 {
+                sfx_play(7, sound, pan);
+            } else if cur == 2 {
+                music_play(music);
+            } else if cur == 4 {
+                done = TRUE;
+            }
+        }
+
+        // Stop music
+        if (trig & PAD_B) != 0 {
+            music_stop();
+            if cur == 4 {
+                done = TRUE;
+            }
+        }
+
+        game_frame_cnt++;
+    }
+
+    fade_screen(0, 1);
 }

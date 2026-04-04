@@ -122,13 +122,10 @@ far fn spc_command(command: u16, param: u16) {
     APU2 = (param & 0xFF) as u8;
     APU3 = (param >> 8) as u8;
 
-    // Wait for acknowledgment (unless reload command)
+    // Increment sync byte (SPC acknowledges by echoing it back).
+    // No busy-wait: the SPC responds within a few cycles when loaded,
+    // and we don't want to freeze gameplay if it's unresponsive.
     if command != SCMD_RELOAD {
-        loop {
-            if APU0 == snes_spc_sync {
-                break;
-            }
-        }
         snes_spc_sync++;
     }
 }
@@ -184,11 +181,22 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
     // Disable NMI during transfer
     NMITIMEN = 0;
 
-    // Wait for APU ready (0xBBAA)
+    // Wait for APU ready (0xBBAA) with timeout
+    let timeout: u16 = 0;
+    let apu_ready: u8 = FALSE;
     loop {
         if APU0 == 0xAA && APU1 == 0xBB {
+            apu_ready = TRUE;
             break;
         }
+        timeout++;
+        if timeout == 0 { break; }  // ~65K iteration timeout
+    }
+
+    // If APU didn't respond, skip entire transfer
+    if apu_ready == FALSE {
+        NMITIMEN = 0x81;
+        return;
     }
 
     // Set destination address
@@ -201,11 +209,14 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
     // Start transfer command
     APU0 = 0xCC;
 
-    // Wait for ready
+    // Wait for ready with timeout
+    timeout = 0;
     loop {
         if APU0 == 0xCC {
             break;
         }
+        timeout++;
+        if timeout == 0 { break; }
     }
 
     let cnt: u8 = 0;
@@ -223,11 +234,14 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
         // Write counter
         APU0 = cnt;
 
-        // Wait for acknowledgment
+        // Wait for acknowledgment with timeout
+        timeout = 0;
         loop {
             if APU0 == cnt {
                 break;
             }
+            timeout++;
+            if timeout == 0 { break; }
         }
 
         cnt++;

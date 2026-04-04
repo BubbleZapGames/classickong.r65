@@ -159,7 +159,11 @@ macro_rules! SPR_PAL($pal:expr) { (($pal & 0x07) << 9) }
 // Build sprite priority attribute: priority << 12
 macro_rules! SPR_PRI($pri:expr) { (($pri & 0x03) << 12) }
 
-// SPR_HFLIP, SPR_VFLIP, BG_HFLIP, BG_VFLIP are defined in sneslib.r65
+// Sprite/BG tile attribute flip constants (u16 ORed with tile number)
+const SPR_HFLIP: u16 = 0x4000;
+const SPR_VFLIP: u16 = 0x8000;
+const BG_HFLIP: u16 = 0x4000;
+const BG_VFLIP: u16 = 0x8000;
 
 // Build BG palette attribute: (palette & 7) << 10
 macro_rules! BG_PAL($pal:expr) { (($pal & 0x07) << 10) }
@@ -197,28 +201,28 @@ far fn rand() -> u16 {
 
 #[interrupt(nmi)]
 far fn nmi_handler() {
-    // Acknowledge NMI by reading RDNMI (required for subsequent NMIs to fire)
-    let _ @ A: u8 = RDNMI;
-
-    // DMA OAM buffer to PPU (channel 7)
-    OAMADDL = 0;
-    OAMADDH = 0;
-
-    // Set DMA parameters for channel 7
-    DMAP7 = 0x00;  // 1 register, write once, increment
-    BBAD7 = 0x04;  // $2104 = OAMDATA
-
-    // Set source address (oam_buffer)
-    A1T7L = (&oam_buffer as u16) as u8;
-    A1T7H = ((&oam_buffer as u16) >> 8) as u8;
-    A1B7 = 0x7E;  // Bank $7E (WRAM)
-
-    // Set size: 544 bytes ($0220)
-    DAS7L = 0x20;
-    DAS7H = 0x02;
-
-    // Trigger DMA
-    MDMAEN = 0x80;  // Channel 7
+    // Minimal NMI handler in pure inline asm for stability
+    asm!(
+        "LDA $4210",         // Acknowledge NMI
+        "STZ $2102",         // OAM address = 0
+        "STZ $2103",
+        "LDA #$00",
+        "STA $4370",         // DMA mode: 1 reg, write, increment
+        "LDA #$04",
+        "STA $4371",         // DMA target: $2104 (OAMDATA)
+        "LDA #<oam_buffer",
+        "STA $4372",         // Source address low
+        "LDA #>oam_buffer",
+        "STA $4373",         // Source address high
+        "LDA #:oam_buffer",
+        "STA $4374",         // Source bank
+        "LDA #$20",
+        "STA $4375",         // Size low ($0220 = 544)
+        "LDA #$02",
+        "STA $4376",         // Size high
+        "LDA #$80",
+        "STA $420B"          // Trigger DMA channel 7
+    );
 
     // Increment frame counter
     frame_cnt++;
@@ -731,10 +735,10 @@ far fn fill_vram(vram_addr @ X: u16, value @ A: u8, size @ Y: u16) {
 // ============================================================================
 
 far fn oam_spr(x_pos: u16, y: u8, chr: u16, off: u16) {
-    oam_buffer[X] = x_pos as u8;
-    oam_buffer[X + 1] = y;
-    oam_buffer[X + 2] = chr as u8;
-    oam_buffer[X + 3] = (chr >> 8) as u8;
+    oam_buffer[off] = x_pos as u8;
+    oam_buffer[off + 1] = y;
+    oam_buffer[off + 2] = chr as u8;
+    oam_buffer[off + 3] = (chr >> 8) as u8;
 
     // Handle X high bit in extended OAM
     let ext_off: u16 = 512 + (off >> 4);
@@ -762,10 +766,10 @@ far fn oam_spr(x_pos: u16, y: u8, chr: u16, off: u16) {
 // ============================================================================
 
 far fn oam_spr1(x: u8, y: u8, chr: u16, off: u16) {
-    oam_buffer[X] = x;
-    oam_buffer[X + 1] = y;
-    oam_buffer[X + 2] = chr as u8;
-    oam_buffer[X + 3] = (chr >> 8) as u8;
+    oam_buffer[off] = x;
+    oam_buffer[off + 1] = y;
+    oam_buffer[off + 2] = chr as u8;
+    oam_buffer[off + 3] = (chr >> 8) as u8;
 }
 
 
@@ -839,9 +843,9 @@ far fn oam_clear() {
 far fn set_bright(level: u8) {
     // Use sneslib macros for screen control
     if level == 0 {
-        screen_off!();
+        set_screen_off!();
     } else {
-        screen_on!(level);
+        set_brightness!(level);
     }
 }
 
@@ -910,7 +914,7 @@ far fn game_init() {
     BG34NBA = 0x44;  // BG3 and 4 at $4000
 
     // Enable sprites and backgrounds (use sneslib macro)
-    enable_main!(SCREEN_OBJ | SCREEN_BG1 | SCREEN_BG2);
+    set_main_layers!(Screen::Obj | Screen::BG1 | Screen::BG2);
 
     // Sprite settings: 8x8 and 16x16, graphics at $2000
     OBSEL = 1;
@@ -937,7 +941,7 @@ far fn game_init() {
     oam_clear();
 
     // Enable NMI and joypad (use sneslib macro)
-    set_nmitimen!(NMI_ENABLE | AUTOJOY_ENABLE);
+    set_nmitimen!(Interrupt::Nmi | Interrupt::AutoJoy);
 }
 
 
@@ -987,9 +991,10 @@ const NAMETABLE2_ADDR: u16 = 0x2C00;
 const NAMETABLE3_ADDR: u16 = 0x3400;
 
 far fn update_nametables() {
-    dma_copy_vram_const!(2, nametable1, 0x0000, 2048);
-    dma_copy_vram_const!(3, nametable2, 0x0400, 2048);
-    dma_copy_vram_const!(4, nametable3, 0x7C00, 2048);
+    // Use channels 5/6/7 to avoid clobbering HDMA channels 0-2
+    dma_copy_vram_const!(5, nametable1, 0x0000, 2048);
+    dma_copy_vram_const!(6, nametable2, 0x0400, 2048);
+    dma_copy_vram_const!(7, nametable3, 0x7C00, 2048);
 }
 
 
@@ -997,29 +1002,58 @@ far fn update_nametables() {
 // FUNCTION: RLE Decompression
 // ============================================================================
 
-far fn unrle(dst: *u8, src: far *u8) {
-    let tag: u8 = *src;
-    src++;
+far fn unrle(src_addr: u16, src_bank: u8) {
+    // RLE decompression from ROM to map[] buffer.
+    // Caller passes address + bank separately to avoid far pointer D=S issues.
+    // We set up a zeropage indirect long pointer manually.
+
+    // Set up source pointer at zeropage $10-$12
+    asm!(
+        "LDA {ADDR}", "STA $10",
+        "LDA {ADDR}+1", "STA $11",
+        "LDA {BANK}", "STA $12",
+        ADDR="SCRATCH0", BANK="SCRATCH2"
+    );
+
+    // Read tag byte via indirect long
+    let tag: u8;
+    Y = 0;
+    asm!("LDA [$10],Y");
+    tag = A;
+
+    // Increment source pointer
+    asm!("INC $10", "BNE +", "INC $11", "+");
 
     let last_byte: u8 = 0;
+    let dst_off: u16 = 0;
 
     loop {
-        let byte: u8 = *src;
-        src++;
+        // Read next byte from source via indirect long
+        let byte: u8;
+        Y = 0;
+        asm!("LDA [$10],Y");
+        byte = A;
+
+        // Increment source pointer
+        asm!("INC $10", "BNE +", "INC $11", "+");
 
         if byte == tag {
-            // Run length
-            let count: u8 = *src;
-            src++;
+            // Run length: read count
+            let count: u8;
+            Y = 0;
+            asm!("LDA [$10],Y");
+            count = A;
+
+            // Increment source pointer
+            asm!("INC $10", "BNE +", "INC $11", "+");
 
             if count == 0 {
-                // End marker
-                break;
+                break;  // End marker
             }
 
             loop {
-                *dst = last_byte;
-                dst++;
+                map[dst_off] = last_byte;
+                dst_off++;
                 count--;
                 if count == 0 {
                     break;
@@ -1028,8 +1062,8 @@ far fn unrle(dst: *u8, src: far *u8) {
         } else {
             // Literal byte
             last_byte = byte;
-            *dst = byte;
-            dst++;
+            map[dst_off] = byte;
+            dst_off++;
         }
     }
 }
@@ -1092,3 +1126,616 @@ far fn put_num(pos: u16, value: u16, digits: u8) {
 // ============================================================================
 
 macro_rules! POS($x:expr, $y:expr) { ((($y as u16) << 5) + ($x as u16)) }
+
+
+// ============================================================================
+// TILE ATTRIBUTE TABLE
+// Maps tile IDs (0-127) to walkmap attributes (8 rows per tile)
+// ============================================================================
+
+static tileAttribute: [u8; 1024] = [
+    // 0x00: empty
+    0,0,0,0,0,0,0,0,
+    // 0x01: floor variant
+    1,0,0,0,0,0,0,0,
+    // 0x02: rivet
+    8,0,0,0,0,0,0,0,
+    // 0x03: ladder top + full ladder
+    3,2,2,2,2,2,2,2,
+    // 0x04-0x05: empty
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    // 0x06-0x07: floor
+    1,0,0,0,0,0,0,0,
+    1,0,0,0,0,0,0,0,
+    // 0x08-0x0F: sloped floors (floor at different rows)
+    1,0,0,0,0,0,0,0,
+    0,1,0,0,0,0,0,0,
+    0,0,1,0,0,0,0,0,
+    0,0,0,1,0,0,0,0,
+    0,0,0,0,1,0,0,0,
+    0,0,0,0,0,1,0,0,
+    0,0,0,0,0,0,1,0,
+    0,0,0,0,0,0,0,1,
+    // 0x10: broken ladder
+    4,4,4,4,4,4,4,4,
+    // 0x11-0x17: empty (decorations)
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    // 0x18-0x1F: floor bottom / decorations
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    // 0x20-0x27: ladder top at different positions
+    3,2,2,2,2,2,2,2,
+    0,3,2,2,2,2,2,2,
+    0,0,3,2,2,2,2,2,
+    0,0,0,3,2,2,2,2,
+    0,0,0,0,3,2,2,2,
+    0,0,0,0,0,3,2,2,
+    0,0,0,0,0,0,3,2,
+    0,0,0,0,0,0,0,3,
+    // 0x28-0x2F: floor with ladder below
+    1,0,0,0,0,0,0,0,
+    2,1,0,0,0,0,0,0,
+    2,2,1,0,0,0,0,0,
+    2,2,2,1,0,0,0,0,
+    2,2,2,2,1,0,0,0,
+    2,2,2,2,2,1,0,0,
+    2,2,2,2,2,2,1,0,
+    2,2,2,2,2,2,2,1,
+    // 0x30-0x37: full ladder columns
+    2,2,2,2,2,2,2,2,
+    2,2,2,2,2,2,2,2,
+    2,2,2,2,2,2,2,2,
+    2,2,2,2,2,2,2,2,
+    2,2,2,2,2,2,2,2,
+    2,2,2,2,2,2,2,2,
+    2,2,2,2,2,2,2,2,
+    2,2,2,2,2,2,2,2,
+    // 0x38-0x3F: empty
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    // 0x40-0x43: barrel area
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    // 0x44-0x47: elevator things (floor)
+    1,0,0,0,0,0,0,0,
+    1,0,0,0,0,0,0,0,
+    1,0,0,0,0,0,0,0,
+    1,0,0,0,0,0,0,0,
+    // 0x48-0x4B: dangerous elevator things
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    // 0x4C-0x4D: fire
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    // 0x4E-0x4F: elevator rope
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    // 0x50-0x5D: empty (decorations, padding to 0x5E)
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    // 0x5E-0x7F: remaining empty entries (34 entries)
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0
+];
+
+
+// ============================================================================
+// GAME STATE - HUD Update Flags
+// ============================================================================
+
+#[lowram]
+static mut game_lives_update: u8;
+
+#[lowram]
+static mut game_score_change: u8;
+
+#[lowram]
+static mut game_bonus_change: u8;
+
+#[lowram]
+static mut game_bonus_cnt: u8;
+
+#[lowram]
+static mut game_update_palette_flag: u8;
+
+#[lowram]
+static mut game_rivets_update: u8;
+
+#[lowram]
+static mut barrel_fire_off: u16;
+
+
+// ============================================================================
+// FUNCTION: Update Displayed Score
+// ============================================================================
+
+// Scratch U32s for score arithmetic
+#[ram]
+static mut score_tmp: U32;
+
+#[ram]
+static mut score_tmp2: U32;
+
+#[ram]
+static mut score_ten: U32;
+
+// Display a U32 score value at nametable position.
+// Score is stored /10 internally; displays 5 digits + trailing '0' = 6 chars.
+far fn put_score(pos: u16, score: far *U32) {
+    score_tmp.copy(score);
+    score_ten.from_u16(10);
+
+    let d: u8 = 5;
+    loop {
+        if d == 0 {
+            break;
+        }
+        d--;
+
+        // digit = score_tmp % 10
+        score_tmp2.copy(&score_tmp);
+        score_tmp2.mod(&score_ten);
+        let digit: u8 = score_tmp2.lo as u8;
+
+        nametable1[pos + (d as u16)] = (0x10 + (digit as u16)) | TEXT_ATR;
+
+        // score_tmp = score_tmp / 10
+        score_tmp.div(&score_ten);
+    }
+
+    // Trailing zero (score display is x10)
+    nametable1[pos + 5] = (0x10 as u16) | TEXT_ATR;
+}
+
+far fn game_update_score() {
+    put_score(POS!(1, 1), &game_score);
+}
+
+
+// ============================================================================
+// FUNCTION: Update Displayed Lives
+// ============================================================================
+
+far fn game_update_lives(lives: u8) {
+    let i: u8 = 0;
+    loop {
+        if i >= 10 {
+            break;
+        }
+
+        if game_flip == 0 {
+            if i < lives {
+                nametable1[POS!(30 - (i as u16), 2)] = TEXT_ATR | 2;
+                nametable1[POS!(30 - (i as u16), 3)] = TEXT_ATR | 3;
+            } else {
+                nametable1[POS!(30 - (i as u16), 2)] = TEXT_ATR;
+                nametable1[POS!(30 - (i as u16), 3)] = TEXT_ATR;
+            }
+        } else {
+            if i < lives {
+                nametable1[POS!(1 + (i as u16), 2)] = TEXT_ATR | 2;
+                nametable1[POS!(1 + (i as u16), 3)] = TEXT_ATR | 3;
+            } else {
+                nametable1[POS!(1 + (i as u16), 2)] = TEXT_ATR;
+                nametable1[POS!(1 + (i as u16), 3)] = TEXT_ATR;
+            }
+        }
+
+        i++;
+    }
+
+    game_lives_update = TRUE;
+}
+
+
+// ============================================================================
+// FUNCTION: Add Score with Extra Life Check
+// ============================================================================
+
+far fn game_add_score(n: u16) {
+    // Save previous score for extra life threshold check
+    score_tmp.copy(&game_score);
+
+    // Add n/10 to game_score (internal value is score/10)
+    score_tmp2.from_u16(div16(n, 10));
+    game_score.add(&score_tmp2);
+
+    game_score_change = TRUE;
+
+    // Cap at 99999 (displayed as 999990)
+    score_tmp2.lo = 0x869F;  // 99999 = 0x0001869F
+    score_tmp2.hi = 0x0001;
+    if game_score.cmp(&score_tmp2) > 0 {
+        game_score.copy(&score_tmp2);
+    }
+
+    // Check for extra life thresholds (internal score/10 values)
+    // 10000 pts = 1000, 25000 = 2500, 50000 = 5000, 100000 = 10000
+    let extra: u8 = FALSE;
+    score_tmp2.from_u16(1000);
+    if score_tmp.cmp(&score_tmp2) < 0 && game_score.cmp(&score_tmp2) >= 0 {
+        extra = TRUE;
+    }
+    score_tmp2.from_u16(2500);
+    if score_tmp.cmp(&score_tmp2) < 0 && game_score.cmp(&score_tmp2) >= 0 {
+        extra = TRUE;
+    }
+    score_tmp2.from_u16(5000);
+    if score_tmp.cmp(&score_tmp2) < 0 && game_score.cmp(&score_tmp2) >= 0 {
+        extra = TRUE;
+    }
+    score_tmp2.from_u16(10000);
+    if score_tmp.cmp(&score_tmp2) < 0 && game_score.cmp(&score_tmp2) >= 0 {
+        extra = TRUE;
+    }
+
+    if extra != FALSE {
+        game_lives++;
+        game_update_lives(game_lives);
+        sfx_play(SFX_CHN + 3, SFX_EXTRA_LIFE, 128);
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Update Displayed Bonus Counter
+// ============================================================================
+
+far fn game_update_bonus() {
+    let x: u16 = 22;
+    if game_flip != 0 {
+        x = 14;
+    }
+
+    if game_bonus != 0xFFFF || (game_frame_cnt & 32) != 0 {
+        let display_val: u16 = game_bonus;
+        if game_bonus >= 0xFFFF {
+            display_val = 0;
+        }
+        put_num(POS!(x, 1), display_val, 4);
+    } else {
+        let i: u8 = 0;
+        loop {
+            if i >= 4 {
+                break;
+            }
+            nametable1[POS!(x + (i as u16), 1)] = 0x0140;
+            i++;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Update All Stats (Score, Lives, Bonus, Labels)
+// ============================================================================
+
+static str_bonus: [u8; 7] = "BONUS:";
+static str_l_eq: [u8; 3] = "L=";
+
+far fn game_update_stats() {
+    let bonus_x: u16 = 16;
+    if game_flip != 0 {
+        bonus_x = 8;
+    }
+    put_str(POS!(bonus_x, 1), &str_bonus as far *u8);
+    put_str(POS!(27, 1), &str_l_eq as far *u8);
+    put_num(POS!(29, 1), (game_loops as u16) + 1, 2);
+
+    game_update_score();
+    game_update_lives(game_lives);
+    game_update_bonus();
+}
+
+
+// ============================================================================
+// FUNCTION: Show/Hide Burning Barrel in Nametable
+// ============================================================================
+
+far fn barrel_show_fire(show: u8) {
+    if game_level < 2 {
+        if show != 0 {
+            nametable1[barrel_fire_off] = 0x018C | BG_PAL!(2) | BG_PRI;
+            nametable1[barrel_fire_off + 1] = 0x018D | BG_PAL!(2) | BG_PRI;
+        } else {
+            nametable1[barrel_fire_off] = 0x0140;
+            nametable1[barrel_fire_off + 1] = 0x0140;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Wait for NMI and Update VRAM (gameplay)
+// ============================================================================
+
+far fn game_wait_and_update_nametables() {
+    nmi_wait();
+
+    // Update stats row
+    set_dma_src(&nametable1 as *u8 as u16 + POS!(0, 1) * 2, 0x7E);
+    copy_to_vram(POS!(0, 1), 32 * 2);
+
+    // Update lives if changed
+    if game_lives_update != 0 {
+        game_lives_update = FALSE;
+        let x: u16 = 21;
+        if game_flip != 0 {
+            x = 1;
+        }
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(x, 2) * 2, 0x7E);
+        copy_to_vram(POS!(x, 2), 10 * 2);
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(x, 3) * 2, 0x7E);
+        copy_to_vram(POS!(x, 3), 10 * 2);
+    }
+
+    // Update burning barrel (level 1) — inline DMA channel 6
+    // (channel 7 is used by NMI for OAM; channels 0-2 by HDMA gradient)
+    if game_level == 0 {
+        let fire_pos: u16 = POS!((barrel_fire_x >> 3) as u16, (barrel_fire_y >> 3) as u16);
+        let fire_src: u16 = (&nametable1 as *u8 as u16) + fire_pos * 2;
+        asm!("LDA #$80", "STA $2115");  // VMAIN: increment after high byte
+        X = fire_pos;
+        asm!("STX $2116");              // VMADD = fire_pos
+        asm!("LDA #$01", "STA $4360");  // DMAP6: 2 registers
+        asm!("LDA #$18", "STA $4361");  // BBAD6: VMDATAL
+        asm!("LDA #$7E", "STA $4364");  // A1B6: bank $7E
+        X = fire_src;
+        asm!("STX $4362");              // A1T6: source address
+        Y = 4;
+        asm!("STY $4365");              // DAS6: 4 bytes
+        asm!("LDA #$40", "STA $420B");  // Start DMA channel 6
+    }
+
+    // Update conveyor belts if changed
+    if game_belts_update != 0 {
+        game_belts_update = FALSE;
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(3, 7) * 2, 0x7E);
+        copy_to_vram(POS!(3, 7), 26 * 2);
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(0, 13) * 2, 0x7E);
+        copy_to_vram(POS!(0, 13), 32 * 2);
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(0, 22) * 2, 0x7E);
+        copy_to_vram(POS!(0, 22), 32 * 2);
+    }
+
+    // Update rivets if changed
+    if game_rivets_update != 0 {
+        game_rivets_update = FALSE;
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 7) * 2, 0x7E);
+        copy_to_vram(POS!(8, 7), 16 * 2);
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 12) * 2, 0x7E);
+        copy_to_vram(POS!(8, 12), 16 * 2);
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 17) * 2, 0x7E);
+        copy_to_vram(POS!(8, 17), 16 * 2);
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 22) * 2, 0x7E);
+        copy_to_vram(POS!(8, 22), 16 * 2);
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Update Background Animation VRAM
+// ============================================================================
+
+far fn game_update_vram_animation() {
+    // Copy animated tileset from ROM to VRAM at $1800
+    if game_level != 1 {
+        set_dma_src((&tileset2_gfx as *u8 as u16) + game_bg_anim, DATA_BANK_1);
+    } else {
+        set_dma_src((&tileset2alt_gfx as *u8 as u16) + game_bg_anim, DATA_BANK_1);
+    }
+    copy_to_vram(0x1800, 512);
+
+    // Update animation counter (advance every 4 frames)
+    if (game_frame_cnt & 3) == 0 {
+        game_bg_anim = game_bg_anim + 512;
+        if game_bg_anim >= 512 * 4 {
+            game_bg_anim = 0;
+        }
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Play Ladder Climbing Sound
+// ============================================================================
+
+far fn game_ladder_sound() {
+    let off: u8 = player_step & 7;
+    if off == 0 {
+        sfx_play(SFX_CHN, SFX_LADDER1, player_x as u16);
+    }
+    if off == 4 {
+        sfx_play(SFX_CHN, SFX_LADDER2, player_x as u16);
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Palette Fade (smooth interpolation)
+// ============================================================================
+
+far fn palette_fade_to(from: u16, to: u16) {
+    let i: u16 = from;
+    loop {
+        if i >= to {
+            break;
+        }
+
+        let current: u16 = palette_buffer[i];
+        let target: u16 = palette_target[i];
+
+        let cr: u16 = current & R_MASK;
+        let cg: u16 = (current >> 5) & 0x1F;
+        let cb: u16 = (current >> 10) & 0x1F;
+
+        let tr: u16 = target & R_MASK;
+        let tg: u16 = (target >> 5) & 0x1F;
+        let tb: u16 = (target >> 10) & 0x1F;
+
+        if cr < tr { cr++; }
+        if cr > tr { cr--; }
+        if cg < tg { cg++; }
+        if cg > tg { cg--; }
+        if cb < tb { cb++; }
+        if cb > tb { cb--; }
+
+        palette_buffer[i] = cr | (cg << 5) | (cb << 10);
+
+        i++;
+    }
+}
+
+
+// ============================================================================
+// FUNCTION: Game Over Screen
+// ============================================================================
+
+far fn game_over() {
+    // Prepare sepia version of current palette
+    let i: u16 = 0;
+    loop {
+        if i >= 240 {
+            break;
+        }
+
+        let color: u16 = palette_buffer[i];
+        let r: u16 = color & R_MASK;
+        let g: u16 = (color >> 5) & 0x1F;
+        let b: u16 = (color >> 10) & 0x1F;
+
+        if i >= 112 && i < 128 {
+            r = 0;
+            g = 0;
+            b = 0;
+        } else {
+            if g < 4 {
+                g = 4;
+            }
+            g = mul16(g, 20) >> 5;
+            r = g;
+            b = g >> 1;
+        }
+
+        palette_target[i] = r | (g << 5) | (b << 10);
+        i++;
+    }
+
+    // Preserve game over text palette, clear current
+    i = 240;
+    loop {
+        if i >= 256 {
+            break;
+        }
+        palette_target[i] = palette_buffer[i];
+        palette_buffer[i] = 0;
+        i++;
+    }
+
+    // Fade to sepia over 32 frames
+    i = 0;
+    loop {
+        if i >= 32 {
+            break;
+        }
+        palette_fade_to(0, 48);
+        palette_fade_to(96, 224);
+        nmi_wait();
+        update_palette();
+        i++;
+    }
+
+    // Display "GAME OVER" text as sprites
+    let x: u8 = 62;
+    let y: u8 = 104;
+
+    i = 0;
+    loop {
+        if i >= 250 {
+            break;
+        }
+
+        palette_fade_to(240, 256);
+
+        oam_spr1(x,            y, ITEMS_TILE + 0x22 | GAMEOVER_ATR, OAM_GAMEOVER + (0 << 2));
+        oam_spr1(x + 15,       y, ITEMS_TILE + 0x24 | GAMEOVER_ATR, OAM_GAMEOVER + (1 << 2));
+        oam_spr1(x + 15 * 2,   y, ITEMS_TILE + 0x26 | GAMEOVER_ATR, OAM_GAMEOVER + (2 << 2));
+        oam_spr1(x + 15 * 3,   y, ITEMS_TILE + 0x28 | GAMEOVER_ATR, OAM_GAMEOVER + (3 << 2));
+        oam_spr1(x + 15 * 5,   y, ITEMS_TILE + 0x2A | GAMEOVER_ATR, OAM_GAMEOVER + (4 << 2));
+        oam_spr1(x + 15 * 6,   y, ITEMS_TILE + 0x2C | GAMEOVER_ATR, OAM_GAMEOVER + (5 << 2));
+        oam_spr1(x + 15 * 7,   y, ITEMS_TILE + 0x28 | GAMEOVER_ATR, OAM_GAMEOVER + (6 << 2));
+        oam_spr1(x + 15 * 8,   y, ITEMS_TILE + 0x2E | GAMEOVER_ATR, OAM_GAMEOVER + (7 << 2));
+
+        nmi_wait();
+        update_palette();
+
+        i++;
+    }
+}

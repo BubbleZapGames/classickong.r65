@@ -209,7 +209,7 @@ macro_rules! NAM_OFF($x:expr, $y:expr) { ((($y as u16) >> 3) << 5) + (($x as u16
 // ============================================================================
 
 far fn test_map(x: u8, y: u16) -> u8 {
-    let offset: u16 = WMAP_OFF!(x, X);
+    let offset: u16 = WMAP_OFF!(x, y);
     return walkmap[offset];
 }
 
@@ -689,7 +689,7 @@ far fn player_process_hammer() {
 
     if player_hammer_time == 0 {
         // Hammer expired - play normal music
-        // TODO: music_play(MUS_LEVEL1);
+        music_play(MUS_LEVEL1);
     }
 
     // Animate hammer

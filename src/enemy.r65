@@ -110,6 +110,12 @@ static mut game_object_jump: u8;
 static mut game_bounce_speed: u8;
 
 #[lowram]
+static mut game_barrels_jumped: u8;
+
+#[lowram]
+static mut game_jump_over: u8;
+
+#[lowram]
 static mut barrel_fire: u8;
 
 #[lowram]
@@ -361,7 +367,7 @@ far fn enemy_add(etype: u8, ex: u8, ey: u8, edx: i8) -> u8 {
         enemy_idy[i] = -3 << BOUNCE_FP;
         enemy_land[i] = 0;
         enemy_speed[i] = game_bounce_speed << 1;
-        // TODO: sfx_play(SFX_CHN+2, SFX_BOUNCE_JUMP, ex);
+        sfx_play(SFX_CHN+2, SFX_BOUNCE_JUMP, ex);
     } else if etype == ENEMY_CEMENT_PAN {
         // Cement pan on conveyor
         if edx != 0 {
@@ -461,18 +467,18 @@ far fn enemy_check_object_jump(ox: u8, oy: u16) -> u8 {
 // FUNCTION: Process Rolling Barrel
 // ============================================================================
 
-far fn process_rolling_barrel(i: u8, spr: u16) -> u8 {
+far fn process_rolling_barrel(i: u8, spr: u16) {
     let ox: u8 = enemy_x[i];
     let oy: u8 = enemy_y[i];
-    let sy: u8;
-    let fire: u8 = FALSE;
 
     // Check for jump over
     if enemy_check_object_jump(ox, oy) != 0 {
-        // TODO: Add barrel jump score
+        game_barrels_jumped++;
+        game_jump_over = TRUE;
     }
 
     // Landing animation
+    let sy: u8;
     if enemy_land[i] < BARREL_LANDING_SIZE {
         sy = oy - barrel_landing_anim[enemy_land[i]];
         enemy_land[i]++;
@@ -497,7 +503,7 @@ far fn process_rolling_barrel(i: u8, spr: u16) -> u8 {
         if (game_frame_cnt & 1) != 0 {
             enemy_x[i] = ox;
             enemy_y[i] = oy;
-            return fire;
+            return;
         }
     } else {
         // On floor
@@ -505,7 +511,7 @@ far fn process_rolling_barrel(i: u8, spr: u16) -> u8 {
             // Just landed - reverse direction and bounce
             enemy_dx[i] = 0 - enemy_dx[i];
             enemy_land[i] = 0;
-            // TODO: sfx_play(SFX_CHN+2, SFX_BARREL1+(rand()&3), ox);
+            sfx_play(SFX_CHN+2, SFX_BARREL1+(rand()&3), ox);
         }
         enemy_fall[i] = 0;
     }
@@ -569,19 +575,38 @@ far fn process_rolling_barrel(i: u8, spr: u16) -> u8 {
     if oy >= 192 {
         if game_flip == 0 {
             if ox == 32 {
-                fire = enemy_remove(i, FALSE);
+                enemy_remove(i, FALSE);
+                // Trigger fire directly (avoids return value clobbered by scratch params)
+                if game_level == 0 {
+                    barrel_fire = TRUE;
+                    barrel_show_fire(TRUE);
+                    if game_fireballs < game_fireballs_max {
+                        game_fireballs++;
+                        enemy_add(ENEMY_FIREBALL_1_JUMP_IN, barrel_fire_x, barrel_fire_y + 8, 0);
+                        sfx_play(SFX_CHN+2, SFX_FIRE_SPAWN, barrel_fire_x+8);
+                    }
+                }
+                return;  // Slot i was freed; don't overwrite with ox/oy below
             }
         } else {
             if ox == 256 - 32 - 16 {
-                fire = enemy_remove(i, FALSE);
+                enemy_remove(i, FALSE);
+                if game_level == 0 {
+                    barrel_fire = TRUE;
+                    barrel_show_fire(TRUE);
+                    if game_fireballs < game_fireballs_max {
+                        game_fireballs++;
+                        enemy_add(ENEMY_FIREBALL_1_JUMP_IN, barrel_fire_x, barrel_fire_y + 8, 0);
+                        sfx_play(SFX_CHN+2, SFX_FIRE_SPAWN, barrel_fire_x+8);
+                    }
+                }
+                return;
             }
         }
     }
 
     enemy_x[i] = ox;
     enemy_y[i] = oy;
-
-    return fire;
 }
 
 
@@ -649,7 +674,7 @@ far fn process_wild_barrel(i: u8, spr: u16, etype: u8) {
                 enemy_dx[i] = 0 - enemy_dx[i];
             }
             enemy_fall[i] = 4;
-            // TODO: sfx_play(SFX_CHN+2, SFX_BARREL1+(rand()&3), ox);
+            sfx_play(SFX_CHN+2, SFX_BARREL1+(rand()&3), ox);
         }
 
         // Convert to rolling barrel at bottom
@@ -692,8 +717,8 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
 
     // Check for jump over
     if enemy_check_object_jump(ox, oy) != 0 {
-        // TODO: game_add_score(100);
-        // TODO: particle_add(PART_TYPE_100, ox, oy);
+        game_barrels_jumped++;
+        game_jump_over = TRUE;
     }
 
     // Determine sprite
@@ -861,7 +886,7 @@ far fn process_bounce(i: u8, spr: u16) -> u8 {
             if bounce_ok != 0 {
                 enemy_idy[i] = -3 << BOUNCE_FP;
                 enemy_land[i] = 10;
-                // TODO: sfx_play(SFX_CHN+2, SFX_BOUNCE_JUMP, ox);
+                sfx_play(SFX_CHN+2, SFX_BOUNCE_JUMP, ox);
             }
         }
 
@@ -877,7 +902,7 @@ far fn process_bounce(i: u8, spr: u16) -> u8 {
         enemy_idy[i] = enemy_idy[i] + bounce_speed[speed_idx + 1];
 
         if enemy_idy[i] >= (3 << BOUNCE_FP) {
-            // TODO: sfx_play(SFX_CHN+2, SFX_BOUNCE_FALL, ox);
+            sfx_play(SFX_CHN+2, SFX_BOUNCE_FALL, ox);
         }
     }
 
@@ -962,7 +987,7 @@ far fn enemy_check_hammer_collision(i: u8, ox: u8, oy: u8) -> u8 {
                     splat_x = ox;
                     splat_y = oy;
                     splat_cnt = 0;
-                    // TODO: sfx_play(SFX_CHN, SFX_DESTROY, ox);
+                    sfx_play(SFX_CHN, SFX_DESTROY, ox);
                     return TRUE;
                 }
             }
@@ -980,27 +1005,24 @@ far fn enemy_check_hammer_collision(i: u8, ox: u8, oy: u8) -> u8 {
 
 far fn enemy_process() -> u8 {
     let clear: u8 = 0;
-    let fire: u8 = FALSE;
     let spr: u16 = OAM_ENEMY;
     let i: u8 = 0;
+    game_barrels_jumped = 0;
+    game_jump_over = FALSE;
 
     loop {
         let etype: u8 = enemy_type[i];
 
         if etype == ENEMY_NONE {
-            spr = spr + 4;
-            i++;
-            if i >= ENEMY_MAX {
-                break;
-            }
-            continue;
-        }
+            // Skip empty slots (no continue to avoid region spill bug)
+            oam_spr1(0, 240, 0, spr);
+        } else {
 
         let ox: u8;
         let oy: u8;
 
         if etype == ENEMY_ROLLING_BARREL {
-            fire = process_rolling_barrel(i, spr);
+            process_rolling_barrel(i, spr);
             ox = enemy_x[i];
             oy = enemy_y[i];
         } else if etype == ENEMY_LADDER_BARREL {
@@ -1080,6 +1102,8 @@ far fn enemy_process() -> u8 {
             }
         }
 
+        } // end else (etype != ENEMY_NONE)
+
         spr = spr + 4;
         i++;
         if i >= ENEMY_MAX {
@@ -1087,18 +1111,27 @@ far fn enemy_process() -> u8 {
         }
     }
 
-    // Spawn fireball if barrel hit fire
-    if fire != 0 {
-        if game_level == 0 {
-            barrel_fire = TRUE;
-            // TODO: barrel_show_fire(TRUE);
+    // Fire spawning now handled directly in process_rolling_barrel
+    // to avoid scratch register clobbering the fire return value
 
-            if game_fireballs < game_fireballs_max {
-                game_fireballs++;
-                enemy_add(ENEMY_FIREBALL_1_JUMP_IN, barrel_fire_x, barrel_fire_y + 8, 0);
-                // TODO: sfx_play(SFX_CHN+2, SFX_FIRE_SPAWN, barrel_fire_x+8);
-            }
-        }
+    // Jump-over scoring and sound
+    if game_jump_over != 0 {
+        sfx_play(SFX_CHN+3, SFX_JUMP_OVER, player_x as u16);
+        game_object_jump = 8;
+    }
+
+    if game_barrels_jumped == 1 {
+        game_add_score(100);
+        particle_add(PART_TYPE_100, player_x, player_y);
+    } else if game_barrels_jumped == 2 {
+        game_add_score(300);
+        particle_add(PART_TYPE_300, player_x, player_y);
+    } else if game_barrels_jumped == 3 {
+        game_add_score(500);
+        particle_add(PART_TYPE_500, player_x, player_y);
+    } else if game_barrels_jumped >= 4 {
+        game_add_score(800);
+        particle_add(PART_TYPE_800, player_x, player_y);
     }
 
     // Decrement object jump cooldown
