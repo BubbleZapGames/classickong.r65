@@ -954,6 +954,13 @@ far fn game_loop() -> u8 {
             game_show_princess(0);
         }
 
+        // Spawn the blinking "HELP" particle near the princess every
+        // 256 frames (matches C original at game_loop.h:1439-1442).
+        if (game_frame_cnt & 0xFF) == 0 {
+            let help_x: u8 = if game_flip == 0 { 96 } else { 176 };
+            particle_add(PART_TYPE_HELP, help_x, 12);
+        }
+
             } // end if splat_active == 0
         } // end else (not start_delay, not paused)
     }
