@@ -181,12 +181,12 @@ const BG_PRI: u16 = 0x2000;  // Local alias for BG_PRIORITY
 // ============================================================================
 
 far fn rand() -> u16 {
-    let val: u16 = rand_seed2;
+    let mut val: u16 = rand_seed2;
     val = val >> 1;
     val = val + rand_seed1;
     rand_seed1 = val;
 
-    let temp: u16 = rand_seed1;
+    let mut temp: u16 = rand_seed1;
     temp = temp ^ 15;
     val = rand_seed2 - temp;
     rand_seed2 = val;
@@ -526,7 +526,7 @@ far fn set_background(n: u8) {
     }
 
     let x_off: u8 = ((n * 8) - n) & 31;
-    let tiles_all: u16;
+    let mut tiles_all: u16;
     if n == 0 {
         tiles_all = 358;
     } else {
@@ -541,8 +541,8 @@ far fn set_background(n: u8) {
     // Convert front layer tiles to mask in back_graphics
     // MAKE_MASK: for each tile's 8 rows, OR the two bitplanes,
     // extend horizontally, then invert to create an opaque mask
-    let ptr: u16 = 0;
-    let off: u16 = 0;
+    let mut ptr: u16 = 0;
+    let mut off: u16 = 0;
     let limit: u16 = tiles_all << 4;
 
     if game_flip == 0 {
@@ -552,9 +552,9 @@ far fn set_background(n: u8) {
                 break;
             }
 
-            let row: u8 = 0;
+            let mut row: u8 = 0;
             loop {
-                let tile: u16 = back_buffer[off + (row as u16)] | back_buffer[off + 8 + (row as u16)];
+                let mut tile: u16 = back_buffer[off + (row as u16)] | back_buffer[off + 8 + (row as u16)];
                 tile = tile | (tile >> 8) | (tile << 8);
                 back_graphics[ptr] = ~tile;
                 ptr++;
@@ -575,12 +575,12 @@ far fn set_background(n: u8) {
                 break;
             }
 
-            let row: u8 = 0;
+            let mut row: u8 = 0;
             loop {
-                let tile: u16 = back_buffer[off + (row as u16)] | back_buffer[off + 8 + (row as u16)];
+                let mut tile: u16 = back_buffer[off + (row as u16)] | back_buffer[off + 8 + (row as u16)];
                 // Flip both bytes using flip_table lookup
-                let lo: u8 = flip_table[(tile & 0xFF) as u8];
-                let hi: u8 = flip_table[(tile >> 8) as u8];
+                let mut lo: u8 = flip_table[(tile & 0xFF) as u8];
+                let mut hi: u8 = flip_table[(tile >> 8) as u8];
                 tile = (lo as u16) | ((hi as u16) << 8);
                 tile = tile | (tile >> 8) | (tile << 8);
                 back_graphics[ptr] = ~tile;
@@ -606,14 +606,14 @@ far fn set_background(n: u8) {
     ptr = 0;
     off = 0;
 
-    let i: u8 = 0;
+    let mut i: u8 = 0;
     loop {
         if i >= 24 {
             break;
         }
 
-        let x: u8 = x_off;
-        let j: u8 = 0;
+        let mut x: u8 = x_off;
+        let mut j: u8 = 0;
         loop {
             if j >= 32 {
                 break;
@@ -625,7 +625,7 @@ far fn set_background(n: u8) {
                 let pp: u16 = (tile_idx - 0x0140) << 3;
 
                 // Apply mask to planes 0-1 (first 8 words of tile)
-                let k: u8 = 0;
+                let mut k: u8 = 0;
                 loop {
                     back_buffer[ptr] = back_buffer[ptr] & back_graphics[pp + (k as u16)];
                     ptr++;
@@ -673,8 +673,8 @@ far fn set_background(n: u8) {
             break;
         }
 
-        let x2: u8 = x_off;
-        let j2: u8 = 0;
+        let mut x2: u8 = x_off;
+        let mut j2: u8 = 0;
         loop {
             if j2 >= 32 {
                 break;
@@ -744,7 +744,7 @@ far fn oam_spr(x_pos: u16, y: u8, chr: u16, off: u16) {
     let ext_off: u16 = 512 + (off >> 4);
     let bit_pos: u8 = ((off & 0x0C) >> 1) as u8;
 
-    let ext_val: u8 = oam_buffer[ext_off];
+    let mut ext_val: u8 = oam_buffer[ext_off];
     let x_high: u8 = ((x_pos >> 8) & 0x01) as u8;
 
     // Clear and set the appropriate bit using bit mask lookup
@@ -781,7 +781,7 @@ far fn oam_size(off: u16, size: u8) {
     let ext_off: u16 = 512 + (off >> 4);
     let bit_pos: u8 = (((off >> 2) & 3) * 2 + 1) as u8;  // Size bit is the odd bit (1,3,5,7)
 
-    let ext_val: u8 = oam_buffer[ext_off];
+    let mut ext_val: u8 = oam_buffer[ext_off];
     let mask: u8 = oam_bit_masks[bit_pos];
 
     if size != 0 {
@@ -801,7 +801,7 @@ far fn oam_size(off: u16, size: u8) {
 // ============================================================================
 
 far fn oam_clear() {
-    let i: u16 = 0;
+    let mut i: u16 = 0;
 
     loop {
         oam_buffer[i] = 0;      // X pos
@@ -927,7 +927,7 @@ far fn game_init() {
     CGADSUB = 0x82;
 
     // Reset scroll
-    let layer: u8 = 0;
+    let mut layer: u8 = 0;
     loop {
         set_scroll_layer(layer, 0, 0);
         layer++;
@@ -950,7 +950,7 @@ far fn game_init() {
 // ============================================================================
 
 far fn clear_nametables() {
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     let empty_tile: u16 = 0x0100;  // Empty tile
 
     loop {
@@ -966,7 +966,7 @@ far fn clear_nametables() {
 
 // Clear nametables with tile 0 (for 8bpp modes where tile $100 wraps)
 far fn clear_nametables_zero() {
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     let zero: u16 = 0;
 
     loop {
@@ -1016,7 +1016,7 @@ far fn unrle(src_addr: u16, src_bank: u8) {
     );
 
     // Read tag byte via indirect long
-    let tag: u8;
+    let mut tag: u8;
     Y = 0;
     asm!("LDA [$10],Y");
     tag = A;
@@ -1024,12 +1024,12 @@ far fn unrle(src_addr: u16, src_bank: u8) {
     // Increment source pointer
     asm!("INC $10", "BNE +", "INC $11", "+");
 
-    let last_byte: u8 = 0;
-    let dst_off: u16 = 0;
+    let mut last_byte: u8 = 0;
+    let mut dst_off: u16 = 0;
 
     loop {
         // Read next byte from source via indirect long
-        let byte: u8;
+        let mut byte: u8;
         Y = 0;
         asm!("LDA [$10],Y");
         byte = A;
@@ -1039,7 +1039,7 @@ far fn unrle(src_addr: u16, src_bank: u8) {
 
         if byte == tag {
             // Run length: read count
-            let count: u8;
+            let mut count: u8;
             Y = 0;
             asm!("LDA [$10],Y");
             count = A;
@@ -1078,7 +1078,7 @@ const TEXT_ATR: u16 = 0x2100;  // 0x0100 (font base) | BG_PAL(0) | BG_PRI (0x200
 far fn put_str(pos: u16, str: far *u8) {
     // Write null-terminated string into nametable1 at POS offset.
     // Uses direct nametable1[] access (long addressing) to avoid DBR issues.
-    let p: u16 = pos;
+    let mut p: u16 = pos;
     loop {
         let ch: u8 = *str;
         str++;
@@ -1088,7 +1088,7 @@ far fn put_str(pos: u16, str: far *u8) {
         }
 
         // Convert ASCII to tile number
-        let tile: u16 = (ch as u16) - 32;
+        let mut tile: u16 = (ch as u16) - 32;
         tile = tile | TEXT_ATR;
 
         nametable1[p] = tile;
@@ -1104,8 +1104,8 @@ far fn put_str(pos: u16, str: far *u8) {
 far fn put_num(pos: u16, value: u16, digits: u8) {
     // Write decimal number into nametable1 at POS offset, right-aligned.
     // Uses direct nametable1[] access (long addressing) to avoid DBR issues.
-    let d: u8 = digits;
-    let v: u16 = value;
+    let mut d: u8 = digits;
+    let mut v: u16 = value;
 
     loop {
         if d == 0 {
@@ -1113,7 +1113,7 @@ far fn put_num(pos: u16, value: u16, digits: u8) {
         }
         d--;
 
-        let digit: u8 = mod16(v, 10) as u8;
+        let mut digit: u8 = mod16(v, 10) as u8;
         v = div16(v, 10);
 
         nametable1[pos + (d as u16)] = (0x10 + (digit as u16)) | TEXT_ATR;  // 0x10 = '0' - 32
@@ -1332,7 +1332,7 @@ far fn put_score(pos: u16, score: far *U32) {
     score_tmp.copy(score);
     score_ten.from_u16(10);
 
-    let d: u8 = 5;
+    let mut d: u8 = 5;
     loop {
         if d == 0 {
             break;
@@ -1342,7 +1342,7 @@ far fn put_score(pos: u16, score: far *U32) {
         // digit = score_tmp % 10
         score_tmp2.copy(&score_tmp);
         score_tmp2.mod(&score_ten);
-        let digit: u8 = score_tmp2.lo as u8;
+        let mut digit: u8 = score_tmp2.lo as u8;
 
         nametable1[pos + (d as u16)] = (0x10 + (digit as u16)) | TEXT_ATR;
 
@@ -1364,7 +1364,7 @@ far fn game_update_score() {
 // ============================================================================
 
 far fn game_update_lives(lives: u8) {
-    let i: u8 = 0;
+    let mut i: u8 = 0;
     loop {
         if i >= 10 {
             break;
@@ -1418,7 +1418,7 @@ far fn game_add_score(n: u16) {
 
     // Check for extra life thresholds (internal score/10 values)
     // 10000 pts = 1000, 25000 = 2500, 50000 = 5000, 100000 = 10000
-    let extra: u8 = FALSE;
+    let mut extra: u8 = FALSE;
     score_tmp2.from_u16(1000);
     if score_tmp.cmp(&score_tmp2) < 0 && game_score.cmp(&score_tmp2) >= 0 {
         extra = TRUE;
@@ -1449,19 +1449,19 @@ far fn game_add_score(n: u16) {
 // ============================================================================
 
 far fn game_update_bonus() {
-    let x: u16 = 22;
+    let mut x: u16 = 22;
     if game_flip != 0 {
         x = 14;
     }
 
     if game_bonus != 0xFFFF || (game_frame_cnt & 32) != 0 {
-        let display_val: u16 = game_bonus;
+        let mut display_val: u16 = game_bonus;
         if game_bonus >= 0xFFFF {
             display_val = 0;
         }
         put_num(POS!(x, 1), display_val, 4);
     } else {
-        let i: u8 = 0;
+        let mut i: u8 = 0;
         loop {
             if i >= 4 {
                 break;
@@ -1481,7 +1481,7 @@ static str_bonus: [u8; 7] = "BONUS:";
 static str_l_eq: [u8; 3] = "L=";
 
 far fn game_update_stats() {
-    let bonus_x: u16 = 16;
+    let mut bonus_x: u16 = 16;
     if game_flip != 0 {
         bonus_x = 8;
     }
@@ -1526,7 +1526,7 @@ far fn game_wait_and_update_nametables() {
     // Update lives if changed
     if game_lives_update != 0 {
         game_lives_update = FALSE;
-        let x: u16 = 21;
+        let mut x: u16 = 21;
         if game_flip != 0 {
             x = 1;
         }
@@ -1536,22 +1536,12 @@ far fn game_wait_and_update_nametables() {
         copy_to_vram(POS!(x, 3), 10 * 2);
     }
 
-    // Update burning barrel (level 1) — inline DMA channel 6
-    // (channel 7 is used by NMI for OAM; channels 0-2 by HDMA gradient)
+    // Update burning barrel (level 1) — same pattern as the conveyor/rivet
+    // updates above, matching the C original at game_loop.h:541-544.
     if game_level == 0 {
         let fire_pos: u16 = POS!((barrel_fire_x >> 3) as u16, (barrel_fire_y >> 3) as u16);
-        let fire_src: u16 = (&nametable1 as *u8 as u16) + fire_pos * 2;
-        asm!("LDA #$80", "STA $2115");  // VMAIN: increment after high byte
-        X = fire_pos;
-        asm!("STX $2116");              // VMADD = fire_pos
-        asm!("LDA #$01", "STA $4360");  // DMAP6: 2 registers
-        asm!("LDA #$18", "STA $4361");  // BBAD6: VMDATAL
-        asm!("LDA #$7E", "STA $4364");  // A1B6: bank $7E
-        X = fire_src;
-        asm!("STX $4362");              // A1T6: source address
-        Y = 4;
-        asm!("STY $4365");              // DAS6: 4 bytes
-        asm!("LDA #$40", "STA $420B");  // Start DMA channel 6
+        set_dma_src(&nametable1 as *u8 as u16 + fire_pos * 2, 0x7E);
+        copy_to_vram(fire_pos, 4);
     }
 
     // Update conveyor belts if changed
@@ -1608,7 +1598,7 @@ far fn game_update_vram_animation() {
 // ============================================================================
 
 far fn game_ladder_sound() {
-    let off: u8 = player_step & 7;
+    let mut off: u8 = player_step & 7;
     if off == 0 {
         sfx_play(SFX_CHN, SFX_LADDER1, player_x as u16);
     }
@@ -1623,7 +1613,7 @@ far fn game_ladder_sound() {
 // ============================================================================
 
 far fn palette_fade_to(from: u16, to: u16) {
-    let i: u16 = from;
+    let mut i: u16 = from;
     loop {
         if i >= to {
             break;
@@ -1632,9 +1622,9 @@ far fn palette_fade_to(from: u16, to: u16) {
         let current: u16 = palette_buffer[i];
         let target: u16 = palette_target[i];
 
-        let cr: u16 = current & R_MASK;
-        let cg: u16 = (current >> 5) & 0x1F;
-        let cb: u16 = (current >> 10) & 0x1F;
+        let mut cr: u16 = current & R_MASK;
+        let mut cg: u16 = (current >> 5) & 0x1F;
+        let mut cb: u16 = (current >> 10) & 0x1F;
 
         let tr: u16 = target & R_MASK;
         let tg: u16 = (target >> 5) & 0x1F;
@@ -1660,16 +1650,16 @@ far fn palette_fade_to(from: u16, to: u16) {
 
 far fn game_over() {
     // Prepare sepia version of current palette
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     loop {
         if i >= 240 {
             break;
         }
 
         let color: u16 = palette_buffer[i];
-        let r: u16 = color & R_MASK;
-        let g: u16 = (color >> 5) & 0x1F;
-        let b: u16 = (color >> 10) & 0x1F;
+        let mut r: u16 = color & R_MASK;
+        let mut g: u16 = (color >> 5) & 0x1F;
+        let mut b: u16 = (color >> 10) & 0x1F;
 
         if i >= 112 && i < 128 {
             r = 0;
@@ -1713,7 +1703,7 @@ far fn game_over() {
     }
 
     // Display "GAME OVER" text as sprites
-    let x: u8 = 62;
+    let mut x: u8 = 62;
     let y: u8 = 104;
 
     i = 0;

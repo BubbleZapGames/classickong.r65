@@ -161,12 +161,12 @@ far fn title_screen_press_start_str(show: u8) {
 // ============================================================================
 
 far fn title_set_rect(off: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
-    let row: u8 = 0;
-    let current_tile: u16 = tile;
-    let pos: u16 = off;
+    let mut row: u8 = 0;
+    let mut current_tile: u16 = tile;
+    let mut pos: u16 = off;
 
     loop {
-        let col: u8 = 0;
+        let mut col: u8 = 0;
         loop {
             nametable1[pos + (col as u16)] = current_tile + (col as u16);
             col++;
@@ -224,11 +224,11 @@ far fn full_title_screen() -> u8 {
 
     setup_hdma_gradient(5);  // Enable title screen color gradient
 
-    let bright: u8 = 0;
+    let mut bright: u8 = 0;
     game_frame_cnt = 0;
-    let cnt: u8 = 0;
-    let codet: u8 = 0;
-    let codeh: u8 = 0;
+    let mut cnt: u8 = 0;
+    let mut codet: u8 = 0;
+    let mut codeh: u8 = 0;
 
     music_play(MUS_TITLE);
 
@@ -313,7 +313,7 @@ far fn full_title_screen() -> u8 {
     sfx_play(SFX_CHN + 3, SFX_START, 128);
 
     // Blink press start text
-    let i: u8 = 0;
+    let mut i: u8 = 0;
     loop {
         title_screen_press_start_str((i & 1) as u8);
         delay(4);
@@ -326,7 +326,7 @@ far fn full_title_screen() -> u8 {
 
     // Check if A+B held for skip intro
     let pad: u16 = pad_poll(0);
-    let skip: u8 = FALSE;
+    let mut skip: u8 = FALSE;
     if (pad & PAD_A) != 0 && (pad & PAD_B) != 0 {
         skip = TRUE;
     }
@@ -375,7 +375,7 @@ far fn cutscene_level() {
     set_background(0xFF);  // Clear BG2 VRAM area
 
     // Fill background with pattern
-    let ptr: u16 = 0;
+    let mut ptr: u16 = 0;
     loop {
         nametable2[ptr] = 0x158 | BG_PAL!(1);
         ptr++;
@@ -405,7 +405,7 @@ far fn cutscene_level() {
     update_palette();
 
     // Set all sprites to 16x16
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     loop {
         oam_size(i << 2, 1);
         i++;
@@ -414,8 +414,8 @@ far fn cutscene_level() {
         }
     }
 
-    let bright: u8 = 0;
-    let delay_cnt: u8 = 25;
+    let mut bright: u8 = 0;
+    let mut delay_cnt: u8 = 25;
 
     setup_hdma_gradient(7);
     spc_volume(global_volume);
@@ -432,7 +432,7 @@ far fn cutscene_level() {
     stack_jump[0] = 0; stack_jump[1] = 0; stack_jump[2] = 0; stack_jump[3] = 0;
     stack_delay[0] = 0; stack_delay[1] = 25; stack_delay[2] = 50; stack_delay[3] = 75;
 
-    let frame: u16 = 0;
+    let mut frame: u16 = 0;
     loop {
         nmi_wait();
 
@@ -443,7 +443,7 @@ far fn cutscene_level() {
         }
 
         // Animate Kong stacks
-        let j: u8 = 0;
+        let mut j: u8 = 0;
         loop {
             if j > game_level {
                 break;
@@ -514,18 +514,18 @@ far fn cutscene_level() {
 // off: platform row (0-5), ptr: nametable position, wdt: width, dx: direction (-1 or 1)
 
 far fn cutscene_update_platform(off: u16, ptr: u16, wdt: u8, dx: i8) {
-    let idx: u16 = off << 5;
-    let pos: u16 = ptr;
-    let cnt: u8 = 0;
-    let hgt: u8 = 1;
+    let mut idx: u16 = off << 5;
+    let mut pos: u16 = ptr;
+    let mut cnt: u8 = 0;
+    let mut hgt: u8 = 1;
 
-    let i: u8 = 0;
+    let mut i: u8 = 0;
     loop {
         if i >= wdt {
             break;
         }
 
-        let j: u8 = platform_anim_cnt[idx];
+        let mut j: u8 = platform_anim_cnt[idx];
         if j < hgt {
             let k: u16 = (j as u16) << 1;
             nametable1[pos] = platform_anim[k];
@@ -554,7 +554,7 @@ far fn cutscene_update_platform(off: u16, ptr: u16, wdt: u8, dx: i8) {
 // ============================================================================
 
 far fn cutscene_intro_show_ladders() {
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     loop {
         if i >= (LADDERS_MAX as u16) {
             break;
@@ -623,7 +623,7 @@ far fn cutscene_intro() {
     unrle(&mapi_data as *u8 as u16, DATA_BANK_1);
 
     // Copy map to nametable
-    let ptr: u16 = 0;
+    let mut ptr: u16 = 0;
     loop {
         nametable1[ptr] = (map[ptr] as u16) + 0x0140 | BG_PAL!(1);
         ptr++;
@@ -637,7 +637,7 @@ far fn cutscene_intro() {
     update_palette();
 
     // Set all sprites to 16x16
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     loop {
         oam_size(i << 2, 1);
         i++;
@@ -659,7 +659,7 @@ far fn cutscene_intro() {
     music_play(MUS_GAME_START);
 
     // Initialize falling ladder fragments
-    let y: u8 = 216;  // 224 - 8
+    let mut y: u8 = 216;  // 224 - 8
     i = 0;
     loop {
         if (i & 1) == 0 {
@@ -684,8 +684,8 @@ far fn cutscene_intro() {
     kong_x = 115;   // 128 - 16 + 3
     kong_y = 240;
 
-    let bright: u8 = 0;
-    let princess_frame: u8 = 0;
+    let mut bright: u8 = 0;
+    let mut princess_frame: u8 = 0;
     let xp_off: u8 = 20;
 
     // ---- Kong climbs up ----
@@ -721,9 +721,9 @@ far fn cutscene_intro() {
     }
 
     // ---- Kong jumps and releases princess ----
-    let ky: i16 = (kong_y as i16) << 6;
-    let kdy: i16 = -64;   // -1 << 6
-    let hold: u8 = TRUE;
+    let mut ky: i16 = (kong_y as i16) << 6;
+    let mut kdy: i16 = -64;   // -1 << 6
+    let mut hold: u8 = TRUE;
 
     loop {
         nmi_wait();
@@ -757,8 +757,8 @@ far fn cutscene_intro() {
     // ---- Kong jumps to position, platforms bend ----
     kong_frame_idx = KONG_ANIM_FACE4_BOTH;
     kdy = -64;   // -1 << 6
-    let jump_cnt: u8 = 0;
-    let frame: u16 = 0;
+    let mut jump_cnt: u8 = 0;
+    let mut frame: u16 = 0;
 
     loop {
         nmi_wait();
@@ -820,7 +820,7 @@ far fn cutscene_intro() {
 
         if jump_cnt >= 6 {
             // Post-jump animation: kong settles into position
-            let j: u8 = (frame >> 2) as u8;
+            let mut j: u8 = (frame >> 2) as u8;
             if j > 3 { j = 3; }
 
             kong_frame_idx = kong_anim_both[3 - (j as u16)];
@@ -885,7 +885,7 @@ far fn cutscene_levels_clear() {
     unrle(&mape_data as *u8 as u16, DATA_BANK_1);
 
     // Copy map to nametable
-    let ptr: u16 = 0;
+    let mut ptr: u16 = 0;
     loop {
         nametable1[ptr] = (map[ptr] as u16) + 0x0140 | BG_PAL!(1) | BG_PRI;
         ptr++;
@@ -898,7 +898,7 @@ far fn cutscene_levels_clear() {
     setup_palettes();
     update_palette();
 
-    let bright: u8 = 0;
+    let mut bright: u8 = 0;
 
     kong_x = 112;
     kong_y = 23;
@@ -913,7 +913,7 @@ far fn cutscene_levels_clear() {
     kong_frame_idx = KONG_ANIM_FACE1;
 
     // Set all sprites to 16x16
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     loop {
         oam_size(i << 2, 1);
         i++;
@@ -924,11 +924,11 @@ far fn cutscene_levels_clear() {
 
     spc_volume(global_volume);
 
-    let frame: u16 = 0;
-    let fall_start: u8 = FALSE;
-    let fall_ground: u8 = FALSE;
-    let ky: i16 = (23 as i16) << 6;
-    let kdy: i16 = 0;
+    let mut frame: u16 = 0;
+    let mut fall_start: u8 = FALSE;
+    let mut fall_ground: u8 = FALSE;
+    let mut ky: i16 = (23 as i16) << 6;
+    let mut kdy: i16 = 0;
 
     loop {
         nmi_wait();
@@ -1026,7 +1026,7 @@ far fn cutscene_next_level() {
     // Show heart
     sfx_play(SFX_CHN, SFX_HEART, player_x);
 
-    let heart_x: u8;
+    let mut heart_x: u8;
     if princess_x < player_x {
         heart_x = player_x - 20;
     } else {
@@ -1038,7 +1038,7 @@ far fn cutscene_next_level() {
     game_show_kong(OAM_KONG, kong_x, kong_y);
 
     // Heart rises
-    let i: u8 = 0;
+    let mut i: u8 = 0;
     loop {
         nmi_wait();
         oam_spr(heart_x as u16, (heart_y as i16) + ((15 - i) >> 1) as i16,
@@ -1052,14 +1052,14 @@ far fn cutscene_next_level() {
     delay(25);
 
     // Kong jumps to ladder and grabs princess (simplified)
-    let target_x: u8;
+    let mut target_x: u8;
     if game_flip == 0 {
         target_x = 76;
     } else {
         target_x = 192;
     }
 
-    let hold: u8 = FALSE;
+    let mut hold: u8 = FALSE;
 
     loop {
         nmi_wait();
@@ -1142,7 +1142,7 @@ far fn sound_test() {
     // Unpack background map (same as cutscene_levels_clear)
     unrle(&mape_data as *u8 as u16, DATA_BANK_1);
 
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     loop {
         nametable1[i] = (map[i] as u16) + 0x0140 | BG_PAL!(1) | BG_PRI;
         i++;
@@ -1178,12 +1178,12 @@ far fn sound_test() {
     global_volume = 120;
     spc_volume(global_volume);
 
-    let sound: u8 = 0;
-    let pan: u8 = 0x80;
-    let music: u8 = 0;
-    let bright: u8 = 0;
-    let cur: u8 = 0;
-    let done: u8 = FALSE;
+    let mut sound: u8 = 0;
+    let mut pan: u8 = 0x80;
+    let mut music: u8 = 0;
+    let mut bright: u8 = 0;
+    let mut cur: u8 = 0;
+    let mut done: u8 = FALSE;
 
     loop {
         if done != FALSE {
@@ -1197,8 +1197,8 @@ far fn sound_test() {
         put_num(POS!(18, 13), global_volume as u16, 3);
 
         // Draw cursor
-        let off: u16 = POS!(9, 10);
-        let row: u8 = 0;
+        let mut off: u16 = POS!(9, 10);
+        let mut row: u8 = 0;
         loop {
             if row == cur {
                 nametable1[off] = TEXT_ATR | (0x40 - 32) as u16;  // '@' - 32 = 0x20

@@ -146,7 +146,7 @@ far fn spc_stereo(stereo: u8) {
 // ============================================================================
 
 far fn spc_volume(volume: u8) {
-    let vol: u8 = volume;
+    let mut vol: u8 = volume;
     if vol > 127 {
         vol = 127;
     }
@@ -182,8 +182,8 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
     NMITIMEN = 0;
 
     // Wait for APU ready (0xBBAA) with timeout
-    let timeout: u16 = 0;
-    let apu_ready: u8 = FALSE;
+    let mut timeout: u16 = 0;
+    let mut apu_ready: u8 = FALSE;
     loop {
         if APU0 == 0xAA && APU1 == 0xBB {
             apu_ready = TRUE;
@@ -219,8 +219,8 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
         if timeout == 0 { break; }
     }
 
-    let cnt: u8 = 0;
-    let ptr: u16 = 0;
+    let mut cnt: u8 = 0;
+    let mut ptr: u16 = 0;
     let remaining: u16 = size;
 
     loop {
@@ -305,8 +305,8 @@ far fn sfx_play(chn: u8, sfx: u8, pan: u8) {
 // ============================================================================
 
 far fn music_play(mus: u8) {
-    let music_data: far *u8;
-    let music_size: u16;
+    let mut music_data: far *u8;
+    let mut music_size: u16;
 
     // Select music data based on track ID
     if mus == MUS_TITLE {

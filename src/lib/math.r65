@@ -17,7 +17,7 @@
 
 // Hardware 8x8 -> 8 unsigned multiply (widening)
 #[cfg(snes)]
-far fn mul8(multA: u8, multB: u16) -> (u8, u8) {
+far fn mul8(multA: u8, multB: u16) -> rA, rB {
     // Write multiplicand
     WRMPYA = multA;
 
@@ -58,7 +58,7 @@ far fn mul16(multA: u8, multB: u16) -> u16 {
 // Returns: low byte and high byte
 // Cycles: ~150-300 depending on operands
 #[cfg(not(snes))]
-far fn mul8(multA: u8, multB: u16) -> (u8, u8) {
+far fn mul8(multA: u8, multB: u16) -> rA, rB {
     // Store multiplicand for shifting
     let mut multiplicand: u8 = multA;
     let mut multiplier: u16 = multB;

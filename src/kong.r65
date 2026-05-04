@@ -325,7 +325,7 @@ static kong_anim_both: [u8; 6] = [
 
 far fn game_show_kong(oam_off: u16, kx: u8, ky: i16) {
     let anim_idx: u8 = kong_frame_idx;
-    let frame: far *u16;
+    let mut frame: far *u16;
 
     // Select frame data based on animation index
     if anim_idx == KONG_ANIM_FACE1 {
@@ -369,11 +369,11 @@ far fn game_show_kong(oam_off: u16, kx: u8, ky: i16) {
     }
 
     // Draw 4 sprites for Kong
-    let i: u8 = 0;
-    let off: u16 = oam_off;
+    let mut i: u8 = 0;
+    let mut off: u16 = oam_off;
 
     loop {
-        let (lo, hi) = mul8(i, 3);
+        let lo, hi = mul8(i, 3);
         let idx: u16 = lo as u16;
         let sx: i16 = (kx as i16) + (frame[idx] as i16);
         let sy: i16 = ky + (frame[idx + 1] as i16);
@@ -412,13 +412,13 @@ static princess_anim: [u16; 6] = [
 ];
 
 far fn game_show_princess(frame: u8) {
-    let flip: u16 = 0;
+    let mut flip: u16 = 0;
     if game_flip != 0 {
         flip = SPR_HFLIP;
     }
 
     if princess_y < 224 {
-        let i: u16 = (frame as u16) << 1;
+        let mut i: u16 = (frame as u16) << 1;
 
         oam_spr1(princess_x, princess_y,
                  princess_anim[i] | flip, OAM_PRINCESS);
@@ -462,7 +462,7 @@ far fn kong_stand_animation_level1() {
 far fn kong_stand_animation_level2() {
     kong_frame_idx = kong_anim_both[kong_frame_cnt];
 
-    let frame: u8 = (game_frame_cnt & 255) as u8;
+    let mut frame: u8 = (game_frame_cnt & 255) as u8;
 
     // Reset at specific frames for synced animation
     if frame == 0 || frame == 35 || frame == 70 || frame == 90 {
@@ -507,10 +507,10 @@ far fn kong_init() {
 // ============================================================================
 
 far fn kong_process_level1() -> u8 {
-    let clear: u8 = 0;
+    let mut clear: u8 = 0;
 
     // Delay between throws decreases with game loops
-    let delay: u16 = (game_loops as u16) * 8;
+    let mut delay: u16 = (game_loops as u16) * 8;
     if delay > 32 {
         delay = 32;
     }
@@ -532,7 +532,7 @@ far fn kong_process_level1() -> u8 {
                 kong_start = FALSE;
 
                 // Show barrel in Kong's hand
-                let barrel_x: u8;
+                let mut barrel_x: u8;
                 if game_flip == 0 {
                     barrel_x = kong_x - 8;
                 } else {
@@ -583,7 +583,7 @@ far fn kong_process_level1() -> u8 {
                 kong_delay = 68;
             } else {
                 // Show barrel on drop side
-                let barrel_x: u8;
+                let mut barrel_x: u8;
                 if game_flip == 0 {
                     barrel_x = kong_x + 24;
                 } else {
@@ -609,8 +609,8 @@ far fn kong_process_level1() -> u8 {
         if kong_delay == 0 && enemy_all < ENEMY_MAX {
             oam_spr(0, 240, 0, OAM_BARRELS + 16);
 
-            let barrel_x: u8;
-            let barrel_dx: i8;
+            let mut barrel_x: u8;
+            let mut barrel_dx: i8;
             if game_flip == 0 {
                 barrel_x = kong_x + 24;
                 barrel_dx = 1;
@@ -679,7 +679,7 @@ far fn kong_process_level1() -> u8 {
 // ============================================================================
 
 far fn kong_process_level2() -> u8 {
-    let clear: u8 = 0;
+    let mut clear: u8 = 0;
 
     kong_stand_animation_level2();
     game_show_kong(OAM_KONG, kong_x, kong_y);
@@ -751,14 +751,14 @@ far fn kong_process_level2() -> u8 {
 // ============================================================================
 
 far fn kong_process_level3() -> u8 {
-    let clear: u8 = 0;
+    let mut clear: u8 = 0;
 
     kong_stand_animation_level2();
     game_show_kong(OAM_KONG, kong_x, kong_y);
 
     // Spawn bouncing springs
     if game_bounce_delay == 0 {
-        let val: i16 = 180 - ((game_loops as i16) << 4);
+        let mut val: i16 = 180 - ((game_loops as i16) << 4);
         if val < 64 {
             val = 64;
         }
@@ -766,7 +766,7 @@ far fn kong_process_level3() -> u8 {
         game_bounce_delay = val as u16;
 
         let random_off: u8 = mod8(rand() as u8, (game_loops + 1) as u8) & 7;
-        let bounce_x: u8;
+        let mut bounce_x: u8;
         if game_flip == 0 {
             bounce_x = (-16 + (random_off as i8)) as u8;
         } else {
@@ -803,7 +803,7 @@ far fn kong_process_level3() -> u8 {
 // ============================================================================
 
 far fn kong_process_level4() -> u8 {
-    let clear: u8 = 0;
+    let mut clear: u8 = 0;
 
     kong_stand_animation_level2();
     game_show_kong(OAM_KONG, kong_x, kong_y);
@@ -811,7 +811,7 @@ far fn kong_process_level4() -> u8 {
     // Calculate difficulty interval (10s - game_loops/2, min 5s)
     // val = base * 60 = base * 64 - base * 4 = (base << 6) - (base << 2)
     let base: i16 = 10 - ((game_loops as i16) / 2);
-    let val: i16 = (base << 6) - (base << 2);
+    let mut val: i16 = (base << 6) - (base << 2);
     if val < 300 {
         val = 300;
     }

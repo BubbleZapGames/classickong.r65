@@ -269,7 +269,7 @@ static bounce_speed: [i16; 10] = [
 
 far fn enemy_clear() {
     // Clear all enemy types
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     loop {
         enemy_type[i] = ENEMY_NONE;
         i++;
@@ -284,7 +284,7 @@ far fn enemy_clear() {
     // Hide all enemy sprites
     i = 0;
     loop {
-        let spr: u16 = OAM_ENEMY + (i << 2);
+        let mut spr: u16 = OAM_ENEMY + (i << 2);
         oam_spr1(0, 240, 0, spr);
         i++;
         if i >= ENEMY_MAX as u16 {
@@ -300,8 +300,8 @@ far fn enemy_clear() {
 // ============================================================================
 
 far fn enemy_add(etype: u8, ex: u8, ey: u8, edx: i8) -> u8 {
-    let i: u8 = enemy_free;
-    let j: u8 = 0;
+    let mut i: u8 = enemy_free;
+    let mut j: u8 = 0;
 
     // Find free slot
     loop {
@@ -324,7 +324,7 @@ far fn enemy_add(etype: u8, ex: u8, ey: u8, edx: i8) -> u8 {
     if etype == ENEMY_ROLLING_BARREL || etype == ENEMY_WILD_BARREL_DOWN ||
        etype == ENEMY_WILD_BARREL_CHANGE || etype == ENEMY_WILD_BARREL_SIDE {
         // Barrel types
-        let dx: i8 = edx;
+        let mut dx: i8 = edx;
 
         if etype == ENEMY_WILD_BARREL_CHANGE {
             dx = -1;
@@ -395,13 +395,13 @@ far fn enemy_add(etype: u8, ex: u8, ey: u8, edx: i8) -> u8 {
 // ============================================================================
 
 far fn enemy_remove(i: u8, destroy: u8) -> u8 {
-    let fire: u8 = FALSE;
+    let mut fire: u8 = FALSE;
 
     // Hide sprite
-    let spr: u16 = OAM_ENEMY + ((i as u16) << 2);
+    let mut spr: u16 = OAM_ENEMY + ((i as u16) << 2);
     oam_spr1(0, 240, 0, spr);
 
-    let etype: u8 = enemy_type[i];
+    let mut etype: u8 = enemy_type[i];
 
     if etype == ENEMY_ROLLING_BARREL {
         // Rolling barrel fires the burning barrel when it gets there
@@ -468,8 +468,8 @@ far fn enemy_check_object_jump(ox: u8, oy: u16) -> u8 {
 // ============================================================================
 
 far fn process_rolling_barrel(i: u8, spr: u16) {
-    let ox: u8 = enemy_x[i];
-    let oy: u8 = enemy_y[i];
+    let mut ox: u8 = enemy_x[i];
+    let mut oy: u8 = enemy_y[i];
 
     // Check for jump over
     if enemy_check_object_jump(ox, oy) != 0 {
@@ -478,7 +478,7 @@ far fn process_rolling_barrel(i: u8, spr: u16) {
     }
 
     // Landing animation
-    let sy: u8;
+    let mut sy: u8;
     if enemy_land[i] < BARREL_LANDING_SIZE {
         sy = oy - barrel_landing_anim[enemy_land[i]];
         enemy_land[i]++;
@@ -487,7 +487,7 @@ far fn process_rolling_barrel(i: u8, spr: u16) {
     }
 
     // Draw barrel sprite
-    let tile: u16 = BARREL_TILE | ((enemy_anim[i] & 3) << 1) as u16 | BARREL_ATR;
+    let mut tile: u16 = BARREL_TILE | ((enemy_anim[i] & 3) << 1) as u16 | BARREL_ATR;
     oam_spr1(ox, sy, tile, spr);
 
     // Check for floor under barrel
@@ -527,7 +527,7 @@ far fn process_rolling_barrel(i: u8, spr: u16) {
     if (ox & 7) == 4 {
         let ladder_check: u8 = test_map(ox + 8, oy + 14);
         if (ladder_check & T_LADDER) != 0 {
-            let take_ladder: u8 = FALSE;
+            let mut take_ladder: u8 = FALSE;
 
             if barrel_fire == 0 {
                 take_ladder = TRUE;
@@ -542,7 +542,7 @@ far fn process_rolling_barrel(i: u8, spr: u16) {
                     if ox == player_x {
                         take_ladder = TRUE;
                     } else {
-                        let barrel_dir: u8;
+                        let mut barrel_dir: u8;
                         if enemy_dx[i] == 1 {
                             barrel_dir = DIR_RIGHT;
                         } else {
@@ -589,7 +589,7 @@ far fn process_rolling_barrel(i: u8, spr: u16) {
                 return;  // Slot i was freed; don't overwrite with ox/oy below
             }
         } else {
-            if ox == 256 - 32 - 16 {
+            if ox == (256 - 32 - 16) as u8 {
                 enemy_remove(i, FALSE);
                 if game_level == 0 {
                     barrel_fire = TRUE;
@@ -615,11 +615,11 @@ far fn process_rolling_barrel(i: u8, spr: u16) {
 // ============================================================================
 
 far fn process_ladder_barrel(i: u8, spr: u16) {
-    let ox: u8 = enemy_x[i];
-    let oy: u8 = enemy_y[i];
+    let mut ox: u8 = enemy_x[i];
+    let mut oy: u8 = enemy_y[i];
 
     // Draw barrel sprite (vertical orientation)
-    let tile: u16 = BARREL_TILE + 0x08 | ((enemy_anim[i] & 1) << 1) as u16 | BARREL_ATR;
+    let mut tile: u16 = BARREL_TILE + 0x08 | ((enemy_anim[i] & 1) << 1) as u16 | BARREL_ATR;
     oam_spr1(ox, oy, tile, spr);
 
     // Move down every other frame
@@ -649,11 +649,11 @@ far fn process_ladder_barrel(i: u8, spr: u16) {
 // ============================================================================
 
 far fn process_wild_barrel(i: u8, spr: u16, etype: u8) {
-    let ox: u8 = enemy_x[i];
-    let oy: u8 = enemy_y[i];
+    let mut ox: u8 = enemy_x[i];
+    let mut oy: u8 = enemy_y[i];
 
     // Draw barrel sprite
-    let tile: u16 = BARREL_TILE + 0x08 | ((enemy_anim[i] & 1) << 1) as u16 | BARREL_ATR;
+    let mut tile: u16 = BARREL_TILE + 0x08 | ((enemy_anim[i] & 1) << 1) as u16 | BARREL_ATR;
     oam_spr1(ox, oy, tile, spr);
 
     if enemy_fall[i] != 0 {
@@ -678,7 +678,7 @@ far fn process_wild_barrel(i: u8, spr: u16, etype: u8) {
         }
 
         // Convert to rolling barrel at bottom
-        let bottom_y: u8;
+        let mut bottom_y: u8;
         if etype != ENEMY_WILD_BARREL_SIDE {
             bottom_y = 192;
         } else {
@@ -711,9 +711,9 @@ far fn process_wild_barrel(i: u8, spr: u16, etype: u8) {
 // ============================================================================
 
 far fn process_fireball(i: u8, spr: u16, etype: u8) {
-    let ox: u8 = enemy_x[i];
-    let oy: u8 = enemy_y[i];
-    let dx: i8 = enemy_dx[i];
+    let mut ox: u8 = enemy_x[i];
+    let mut oy: u8 = enemy_y[i];
+    let mut dx: i8 = enemy_dx[i];
 
     // Check for jump over
     if enemy_check_object_jump(ox, oy) != 0 {
@@ -722,7 +722,7 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
     }
 
     // Determine sprite
-    let anim: u16 = ENEMY_TILE + 0x04 | ((game_frame_cnt & 2) as u16) | ENEMY_ATR;
+    let mut anim: u16 = ENEMY_TILE + 0x04 | ((game_frame_cnt & 2) as u16) | ENEMY_ATR;
     if dx <= 1 {
         anim = anim | SPR_HFLIP;
     }
@@ -805,7 +805,7 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
                 // Check down
                 let ladder_down: u8 = test_map(ox + 8, oy + 16);
                 if (ladder_down & T_LADDER) != 0 {
-                    let val: u8;
+                    let mut val: u8;
                     if player_y > oy {
                         val = 64 + (game_loops << 4);
                     } else {
@@ -819,7 +819,7 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
                 // Check up
                 let ladder_up: u8 = test_map(ox + 8, oy + 15);
                 if (ladder_up & T_LADDER) != 0 && oy > 40 {
-                    let val: u8;
+                    let mut val: u8;
                     if player_y < oy {
                         val = 64 + (game_loops << 4);
                     } else {
@@ -860,11 +860,11 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
 // ============================================================================
 
 far fn process_bounce(i: u8, spr: u16) -> u8 {
-    let ox: u8 = (enemy_ix[i] >> BOUNCE_FP) as u8;
-    let oy: u8 = (enemy_iy[i] >> BOUNCE_FP) as u8;
+    let mut ox: u8 = (enemy_ix[i] >> BOUNCE_FP) as u8;
+    let mut oy: u8 = (enemy_iy[i] >> BOUNCE_FP) as u8;
 
     // Draw sprite
-    let tile: u16;
+    let mut tile: u16;
     if enemy_land[i] != 0 {
         tile = ENEMY_TILE + 0x02 | ENEMY_ATR;
     } else {
@@ -876,7 +876,7 @@ far fn process_bounce(i: u8, spr: u16) -> u8 {
     if enemy_idy[i] < (3 << BOUNCE_FP) {
         // Check for bounce
         if oy >= enemy_sy[i] {
-            let bounce_ok: u8;
+            let mut bounce_ok: u8;
             if game_flip == 0 {
                 bounce_ok = (ox < 184) as u8;
             } else {
@@ -968,7 +968,7 @@ far fn enemy_check_hammer_collision(i: u8, ox: u8, oy: u8) -> u8 {
     }
 
     // Calculate hammer position
-    let hammer_off: u8;
+    let mut hammer_off: u8;
     if player_dir_prev == DIR_LEFT {
         hammer_off = player_hammer_phase * 2;
     } else {
@@ -1004,22 +1004,22 @@ far fn enemy_check_hammer_collision(i: u8, ox: u8, oy: u8) -> u8 {
 // ============================================================================
 
 far fn enemy_process() -> u8 {
-    let clear: u8 = 0;
-    let spr: u16 = OAM_ENEMY;
-    let i: u8 = 0;
+    let mut clear: u8 = 0;
+    let mut spr: u16 = OAM_ENEMY;
+    let mut i: u8 = 0;
     game_barrels_jumped = 0;
     game_jump_over = FALSE;
 
     loop {
-        let etype: u8 = enemy_type[i];
+        let mut etype: u8 = enemy_type[i];
 
         if etype == ENEMY_NONE {
             // Skip empty slots (no continue to avoid region spill bug)
             oam_spr1(0, 240, 0, spr);
         } else {
 
-        let ox: u8;
-        let oy: u8;
+        let mut ox: u8;
+        let mut oy: u8;
 
         if etype == ENEMY_ROLLING_BARREL {
             process_rolling_barrel(i, spr);
@@ -1044,7 +1044,7 @@ far fn enemy_process() -> u8 {
             }
             oy = enemy_y[i] + (fireball_jump_in_anim[off + 1] as u8);
 
-            let tile: u16 = ENEMY_TILE + 0x04 | (((game_frame_cnt >> 1) & 1) << 1) as u16 | ENEMY_ATR;
+            let mut tile: u16 = ENEMY_TILE + 0x04 | (((game_frame_cnt >> 1) & 1) << 1) as u16 | ENEMY_ATR;
             if game_flip == 0 {
                 oam_spr1(ox, oy - 2, tile | SPR_HFLIP, spr);
             } else {
@@ -1060,7 +1060,7 @@ far fn enemy_process() -> u8 {
             ox = enemy_x[i];
             oy = enemy_y[i];
 
-            let tile: u16 = ENEMY_TILE + 0x04 | (((game_frame_cnt >> 1) & 1) << 1) as u16 | ENEMY_ATR | SPR_HFLIP;
+            let mut tile: u16 = ENEMY_TILE + 0x04 | (((game_frame_cnt >> 1) & 1) << 1) as u16 | ENEMY_ATR | SPR_HFLIP;
             oam_spr1(ox, oy - 2, tile, spr);
 
             enemy_cnt[i]++;
@@ -1081,10 +1081,57 @@ far fn enemy_process() -> u8 {
             ox = (enemy_ix[i] >> BOUNCE_FP) as u8;
             oy = (enemy_iy[i] >> BOUNCE_FP) as u8;
         } else if etype == ENEMY_CEMENT_PAN {
-            // TODO: Implement cement pan
-            ox = enemy_x[i];
+            let mut dx: i16 = enemy_ix[i];
+            ox = dx as u8;
             oy = enemy_y[i];
-            oam_spr1(0, 240, 0, spr);  // Hide for now
+
+            if dx > 1 && dx < 254 {
+                oam_spr1(ox, oy, PLAYER_TILE + 0x48 | PLAYER_ATR, spr);
+
+                if enemy_check_object_jump(ox, oy) != 0 {
+                    game_add_score(100);
+                    particle_add(PART_TYPE_100, ox, oy);
+                    game_jump_over = TRUE;
+                }
+            } else {
+                oam_spr(dx as u16, oy, PLAYER_TILE + 0x48 | PLAYER_ATR, spr);
+                etype = ENEMY_NONE;  // Off-screen, skip collision
+            }
+
+            // Move cement pan along conveyor (every other frame)
+            if (game_frame_cnt & 1) != 0 {
+                if oy < 160 {
+                    // Middle belt
+                    if dx != 120 {
+                        // Moving along belt
+                        if conveyor_dir[1] == 0 {
+                            if dx < 120 { enemy_ix[i]++; } else { enemy_ix[i]--; }
+                        } else {
+                            if dx > 120 { enemy_ix[i]++; } else { enemy_ix[i]--; }
+                        }
+                    } else {
+                        // At center — falls into fire
+                        oy++;
+                        enemy_y[i] = oy;
+
+                        if oy >= 88 + 8 {
+                            sfx_play(SFX_CHN + 3, SFX_BURN, ox);
+                            particle_add(PART_TYPE_SMOKE_UP, 120, oy + 4);
+                            enemy_remove(i, FALSE);
+                            etype = ENEMY_NONE;
+                        }
+                    }
+                } else {
+                    // Bottom belt
+                    if conveyor_dir[2] != 0 { enemy_ix[i]++; } else { enemy_ix[i]--; }
+                }
+
+                // Check if pan went off screen
+                if dx < -16 || dx > 256 {
+                    enemy_remove(i, FALSE);
+                    etype = ENEMY_NONE;
+                }
+            }
         }
 
         // Check collisions if enemy still active
@@ -1096,8 +1143,16 @@ far fn enemy_process() -> u8 {
 
             // Check hammer collision
             if enemy_check_hammer_collision(i, ox, oy) != 0 {
-                // Enemy destroyed by hammer
-                // TODO: Add score based on enemy type
+                // Enemy destroyed by hammer — fireballs give 500, rest give 300
+                let mut score: u16 = 300;
+                let mut particle: u8 = PART_TYPE_300;
+                if etype == ENEMY_FIREBALL_1 || etype == ENEMY_FIREBALL_2 ||
+                   etype == ENEMY_FIREBALL_1_JUMP_IN || etype == ENEMY_FIREBALL_1_SPAWN {
+                    score = 500;
+                    particle = PART_TYPE_500;
+                }
+                game_add_score(score);
+                particle_add(particle, ox, oy);
                 enemy_remove(i, TRUE);
             }
         }

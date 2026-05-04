@@ -7,7 +7,7 @@
 #[snesrom(name = "CLASSIC KONG", lorom, fastrom)]
 
 // Include standard libraries
-include!("../../stdlib/sneslib.r65")
+include!("lib/sneslib.r65")
 include!("lib/math.r65")
 include!("lib/U32.r65")
 include!("lib/65816.r65")
@@ -236,6 +236,10 @@ far fn setup_ingame_graphics() {
 // ============================================================================
 
 far fn show_logo() {
+    // Force-blank the screen before VRAM DMA — VRAM writes are blocked
+    // while the display is on, so set brightness to 0 (force-blank) first.
+    set_bright(0);
+
     // Set mode 3 for 256-color logo
     BGMODE = BG::Mode3 as u8 | 0x08;  // Mode 3, BG3 priority
 
@@ -260,11 +264,11 @@ far fn show_logo() {
     // Set up logo tiles in nametable
     // Graphics at VRAM $0800 words ($1000 bytes), BG1 base at $0000
     // First tile = $1000 / 64 bytes per 8bpp tile = tile 64
-    let n: u16 = 64;
-    let row: u8 = 0;
+    let mut n: u16 = 64;
+    let mut row: u8 = 0;
 
     loop {
-        let col: u8 = 0;
+        let mut col: u8 = 0;
         loop {
             let pos: u16 = POS!(2 + col, 12 + row);
             nametable1[pos] = n;
@@ -284,8 +288,8 @@ far fn show_logo() {
     update_palette();
 
     // Fade in
-    let bright: u8 = 0;
-    let pixel: u8 = 0;
+    let mut bright: u8 = 0;
+    let mut pixel: u8 = 0;
 
     loop {
         nmi_wait();
@@ -310,7 +314,7 @@ far fn show_logo() {
 // ============================================================================
 
 far fn fade_screen(fade_in: u8, with_sound: u8) {
-    let level: u8 = 1;
+    let mut level: u8 = 1;
 
     loop {
         nmi_wait();
@@ -348,7 +352,7 @@ far fn show_pal_warning() {
     setup_palettes();
     update_palette();
 
-    let bright: u8 = 0;
+    let mut bright: u8 = 0;
 
     loop {
         nmi_wait();
@@ -397,18 +401,18 @@ far fn unpack_level() {
 
     // Mirror map if game is flipped
     if game_flip != 0 {
-        let ptr: u16 = 0;
-        let i: u16 = 0;
+        let mut ptr: u16 = 0;
+        let mut i: u16 = 0;
         loop {
             if i >= 32 {
                 break;
             }
-            let j: u16 = 0;
+            let mut j: u16 = 0;
             loop {
                 if j >= 16 {
                     break;
                 }
-                let n: u8 = map[ptr + j];
+                let mut n: u8 = map[ptr + j];
                 map[ptr + j] = map[ptr + 31 - j];
                 map[ptr + 31 - j] = n;
                 j++;
@@ -426,24 +430,24 @@ far fn unpack_level() {
     fireball_spawn_all = 0;
 
     // Convert map into walkmap and extract object markers
-    let ptr: u16 = 0;
-    let y: u16 = 0;
-    let i: u16 = 0;
+    let mut ptr: u16 = 0;
+    let mut y: u16 = 0;
+    let mut i: u16 = 0;
 
     loop {
         if i >= 28 {
             break;
         }
 
-        let x: u16 = 0;
-        let j: u16 = 0;
+        let mut x: u16 = 0;
+        let mut j: u16 = 0;
 
         loop {
             if j >= 32 {
                 break;
             }
 
-            let n: u8 = map[ptr];
+            let mut n: u8 = map[ptr];
 
             // Check for object markers
             if n == 0x48 || n == 0x4A {
@@ -522,7 +526,7 @@ far fn unpack_level() {
             }
 
             // Convert tile to nametable entry
-            let k: u16 = (n as u16) + 0x0140;
+            let mut k: u16 = (n as u16) + 0x0140;
             if n < 0x40 {
                 k = k | BG_PAL!(1);
             } else {
@@ -530,7 +534,7 @@ far fn unpack_level() {
             }
 
             // Set priority for certain tiles
-            let pri_threshold: u8 = 0x4E;
+            let mut pri_threshold: u8 = 0x4E;
             if game_level == 1 {
                 pri_threshold = 0x44;
             }
@@ -558,7 +562,7 @@ far fn unpack_level() {
             nametable1[ptr] = k;
 
             // Remap tiles for level 2 conveyor walkmap
-            let wn: u8 = n;
+            let mut wn: u8 = n;
             if game_level == 1 {
                 if n == 0x40 || n == 0x41 || n == 0x44 || n == 0x45 ||
                    n == 0x47 || n == 0x48 || n == 0x49 || n == 0x4B {
@@ -569,9 +573,9 @@ far fn unpack_level() {
             }
 
             // Write 8 rows of walkmap data from tile attribute table
-            let woff: u16 = (i << 8) + j;
+            let mut woff: u16 = (i << 8) + j;
             let wn_base: u16 = (wn as u16) << 3;  // wn * 8
-            let wk: u16 = 0;
+            let mut wk: u16 = 0;
             loop {
                 if wk >= 8 {
                     break;
@@ -610,8 +614,8 @@ far fn unpack_level() {
 
 far fn game_show_ladders() {
     if game_level == 1 {
-        let dx: u8 = 0;
-        let flip: u16 = 0;
+        let mut dx: u8 = 0;
+        let mut flip: u16 = 0;
 
         if game_flip != 0 {
             dx = 248;  // -8 as u8
@@ -633,9 +637,9 @@ far fn game_show_ladders() {
 far fn game_loop() -> u8 {
     // game_init resets PPU state (cutscene_level changes BG12NBA)
 
-    let clear: u8 = 0;
-    let pause: u8 = FALSE;
-    let start_delay: u16 = 50;
+    let mut clear: u8 = 0;
+    let mut pause: u8 = FALSE;
+    let mut start_delay: u16 = 50;
 
     game_flip = div8(game_loops, 5) & 1;  // Flip every 5 loops
 
@@ -745,7 +749,7 @@ far fn game_loop() -> u8 {
 
         conveyor_cnt_middle = 255;  // 10*60 would overflow u8, use max
 
-        let ci: u8 = 0;
+        let mut ci: u8 = 0;
         loop {
             if ci >= 3 {
                 break;
@@ -762,7 +766,7 @@ far fn game_loop() -> u8 {
         ladders_x[0] = 32;
         ladders_x[1] = 216;
 
-        let li: u8 = 0;
+        let mut li: u8 = 0;
         loop {
             if li >= 2 {
                 break;
@@ -783,7 +787,7 @@ far fn game_loop() -> u8 {
     update_palette();
 
     // Set all sprites to 16x16
-    let i: u16 = 0;
+    let mut i: u16 = 0;
     loop {
         oam_size(i, 1);
         i = i + 4;
@@ -794,7 +798,7 @@ far fn game_loop() -> u8 {
 
     // Barrel pile for level 1
     if game_level == 0 {
-        let bx: u8 = 0;
+        let mut bx: u8 = 0;
         if game_flip != 0 {
             bx = 208;
         }
@@ -811,7 +815,7 @@ far fn game_loop() -> u8 {
     setup_hdma_gradient(game_level + 1);
     music_play(MUS_LEVEL1);
 
-    let bright: u16 = 0;
+    let mut bright: u16 = 0;
 
     // Main gameplay loop
     loop {
@@ -967,7 +971,7 @@ far fn game_loop() -> u8 {
         music_play(MUS_LOSE);
 
         // Phase 1: Spinning animation (28*4 = 112 frames)
-        let di: u16 = 0;
+        let mut di: u16 = 0;
         loop {
             if di >= 112 {
                 break;
@@ -985,7 +989,7 @@ far fn game_loop() -> u8 {
             if di >= 150 {
                 break;
             }
-            let spr: u16;
+            let mut spr: u16;
             if (di as u8) & 8 != 0 {
                 spr = PLAYER_TILE + 0x2E | PLAYER_ATR;
             } else {
@@ -1012,7 +1016,7 @@ far fn game_loop() -> u8 {
         music_play(MUS_STAGE_CLEAR);
 
         // Show player standing facing princess
-        let stand_spr: u16;
+        let mut stand_spr: u16;
         if princess_x < player_x {
             stand_spr = player_walk_anim_left[0];
         } else {
@@ -1021,7 +1025,7 @@ far fn game_loop() -> u8 {
         oam_spr1(player_x, player_y - 1, stand_spr, OAM_PLAYER);
 
         // Bonus countdown: wait 50 frames then count down bonus adding to score
-        let wait: u16 = 50;
+        let mut wait: u16 = 50;
         loop {
             if wait == 0 && game_bonus == 0 {
                 break;
@@ -1074,6 +1078,14 @@ far fn main() -> ! {
 
     // Clear VRAM
     fill_vram(0, 0, 65535);
+
+    // Enable NMI + auto-joypad (required before any nmi_wait() call)
+    NMITIMEN = Interrupt::Nmi | Interrupt::AutoJoy;
+    set_bright(7);
+
+    show_logo();
+    
+    fade_screen(0, 0);
 
     // Skip logo/SPC for fast debugging
     game_init();

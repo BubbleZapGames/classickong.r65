@@ -1,3 +1,12 @@
+// R65 Standard Library - U32 (32-bit Unsigned Integer) Support
+//
+// Provides 32-bit unsigned integer arithmetic, comparisons, and conversions.
+// All methods avoid explicit A register usage for correct codegen in m8 mode.
+//
+// Usage:
+//   include!("lib/U32.r65")
+
+include!("math.r65")
 
 // ============================================================================
 // U32 (32-bit Unsigned Integer) Support

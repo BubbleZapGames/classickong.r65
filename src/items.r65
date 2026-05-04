@@ -139,7 +139,7 @@ far fn particle_clear(id: u8) {
 // ============================================================================
 
 far fn particles_clear() {
-    let i: u8 = 0;
+    let mut i: u8 = 0;
     loop {
         particle_type[i] = PART_TYPE_NONE;
         particle_clear(i);
@@ -156,11 +156,11 @@ far fn particles_clear() {
 // ============================================================================
 
 far fn particle_add(ptype: u8, px: u8, py: u8) {
-    let i: u8 = particle_free;
-    let j: u8 = 0;
-    let cnt1: u8 = 0;
-    let cnt2: u8 = 0;
-    let spr: u16 = 0;
+    let mut i: u8 = particle_free;
+    let mut j: u8 = 0;
+    let mut cnt1: u8 = 0;
+    let mut cnt2: u8 = 0;
+    let mut spr: u16 = 0;
 
     // Find free particle slot
     loop {
@@ -221,9 +221,9 @@ far fn particle_add(ptype: u8, px: u8, py: u8) {
 // ============================================================================
 
 far fn particle_process() {
-    let spr: u16 = OAM_PARTICLES;
+    let mut spr: u16 = OAM_PARTICLES;
     let frame: u8 = game_frame_cnt as u8;
-    let i: u8 = 0;
+    let mut i: u8 = 0;
 
     loop {
         let ptype: u8 = particle_type[i];
@@ -328,7 +328,7 @@ far fn particle_process() {
 // ============================================================================
 
 far fn items_clear() {
-    let i: u8 = 0;
+    let mut i: u8 = 0;
     loop {
         item_type[i] = ITEM_NONE;
         oam_spr1(0, 240, 0, OAM_ITEMS + ((i as u16) << 2));
@@ -363,8 +363,8 @@ far fn game_item_add(x: u8, y: u8, itype: u8) {
 // ============================================================================
 
 far fn items_draw() {
-    let spr: u16 = OAM_ITEMS;
-    let i: u8 = 0;
+    let mut spr: u16 = OAM_ITEMS;
+    let mut i: u8 = 0;
 
     loop {
         let itype: u8 = item_type[i];
@@ -390,8 +390,8 @@ far fn items_draw() {
 // ============================================================================
 
 far fn items_check_collision() -> u8 {
-    let anim: u8 = FALSE;
-    let i: u8 = 0;
+    let mut anim: u8 = FALSE;
+    let mut i: u8 = 0;
 
     loop {
         let itype: u8 = item_type[i];
@@ -422,8 +422,8 @@ far fn items_check_collision() -> u8 {
                     if item_x[i] + 8 >= player_x + 4 {
                         if item_x[i] <= player_x + 12 {
                             // Got item!
-                            let score: u16;
-                            let particle: u8;
+                            let mut score: u16;
+                            let mut particle: u8;
 
                             if itype == ITEM_UMBRELLA {
                                 score = 300;
@@ -466,7 +466,7 @@ far fn items_check_collision() -> u8 {
 // ============================================================================
 
 far fn elevators_clear() {
-    let i: u8 = 0;
+    let mut i: u8 = 0;
     loop {
         elevator_x[i] = 0;
         elevator_y[i] = 0;
@@ -505,8 +505,8 @@ far fn elevator_add(x: u8, y: u8, dy: i8) {
 // ============================================================================
 
 far fn elevators_process() {
-    let spr: u16 = OAM_ELEVATORS;
-    let i: u8 = 0;
+    let mut spr: u16 = OAM_ELEVATORS;
+    let mut i: u8 = 0;
 
     loop {
         if i >= elevators_all {
@@ -514,7 +514,7 @@ far fn elevators_process() {
         }
 
         // Clear old walkmap entry
-        let ey: i16 = elevator_y[i];
+        let mut ey: i16 = elevator_y[i];
         if ey < (elevator_bottom as i16) - 4 {
             let off: u16 = ((ey as u16) << 5) + ((elevator_x[i] as u16) >> 3);
             walkmap[off] = 0;

@@ -319,8 +319,8 @@ far fn player_clip_right() -> u8 {
 // ============================================================================
 
 far fn player_process_ground(pad: u16) {
-    let floor1: u8;
-    let floor2: u8;
+    let mut floor1: u8;
+    let mut floor2: u8;
 
     player_dir = DIR_NONE;
 
@@ -348,10 +348,10 @@ far fn player_process_ground(pad: u16) {
 
     // Update walk animation based on direction
     if player_dir == DIR_LEFT {
-        let frame: u8 = mod8((player_step >> 2) as u8, 6);
+        let mut frame: u8 = mod8((player_step >> 2) as u8, 6);
         player_anim = player_walk_anim_left[frame];
     } else if player_dir == DIR_RIGHT {
-        let frame: u8 = mod8((player_step >> 2) as u8, 6);
+        let mut frame: u8 = mod8((player_step >> 2) as u8, 6);
         player_anim = player_walk_anim_right[frame];
     }
 }
@@ -362,8 +362,8 @@ far fn player_process_ground(pad: u16) {
 // ============================================================================
 
 far fn player_check_ladder(pad: u16) {
-    let floor1: u8;
-    let floor2: u8;
+    let mut floor1: u8;
+    let mut floor2: u8;
 
     // Can't climb with hammer
     if player_hammer_time != 0 {
@@ -405,10 +405,10 @@ far fn player_check_ladder(pad: u16) {
 // ============================================================================
 
 far fn player_process_ladder(pad: u16) {
-    let floor1: u8;
+    let mut floor1: u8;
     let x: u8 = player_x + 7;
-    let anim: u8 = FALSE;
-    let off: u8;
+    let mut anim: u8 = FALSE;
+    let mut off: u8;
 
     // Climb UP
     if pad & PAD_UP != 0 {
@@ -420,7 +420,9 @@ far fn player_process_ladder(pad: u16) {
                 if player_ladder_div() != 0 {
                     player_y--;
                     player_step++;
-                    // TODO: Add ladder sound here
+                    let off: u8 = player_step & 7;
+                    if off == 0 { sfx_play(SFX_CHN, SFX_LADDER1, player_x); }
+                    if off == 4 { sfx_play(SFX_CHN, SFX_LADDER2, player_x); }
                 }
                 anim = TRUE;
             } else {
@@ -439,7 +441,9 @@ far fn player_process_ladder(pad: u16) {
                 if player_ladder_div() != 0 {
                     player_y++;
                     player_step++;
-                    // TODO: Add ladder sound here
+                    let off: u8 = player_step & 7;
+                    if off == 0 { sfx_play(SFX_CHN, SFX_LADDER1, player_x); }
+                    if off == 4 { sfx_play(SFX_CHN, SFX_LADDER2, player_x); }
                 }
                 anim = TRUE;
             } else {
@@ -464,7 +468,7 @@ far fn player_process_ladder(pad: u16) {
             off = 2;
         }
 
-        let frame: u8 = ((player_step >> 2) & 1) + off;
+        let mut frame: u8 = ((player_step >> 2) & 1) + off;
         player_anim = player_climb_anim[frame];
     }
 }
@@ -476,8 +480,8 @@ far fn player_process_ladder(pad: u16) {
 // ============================================================================
 
 far fn player_check_floor() -> u8 {
-    let left: u8 = test_map(player_x + 8 - PLR_BBOX_HWDT, player_y + 16);
-    let right: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16);
+    let mut left: u8 = test_map(player_x + 8 - PLR_BBOX_HWDT, player_y + 16);
+    let mut right: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16);
     return left | right;
 }
 
@@ -488,7 +492,7 @@ far fn player_check_floor() -> u8 {
 // ============================================================================
 
 far fn player_process_fall() -> u8 {
-    let floor1: u8 = player_check_floor();
+    let mut floor1: u8 = player_check_floor();
 
     if (floor1 & T_SOLID) == 0 {
         // No floor - continue falling
@@ -514,7 +518,7 @@ far fn player_process_fall() -> u8 {
             let max_y: u8 = player_jump_y + MAX_FALL_HEIGHT;
 
             if player_y >= max_y {
-                // TODO: Play landing sound
+                sfx_play(SFX_CHN, SFX_HERO_LANDS, player_x);
                 return LEVEL_LOSE;
             }
         }
@@ -529,9 +533,9 @@ far fn player_process_fall() -> u8 {
 // ============================================================================
 
 far fn player_push_out_of_floor() {
-    let y: u8 = player_y + 15;
-    let left: u8;
-    let right: u8;
+    let mut y: u8 = player_y + 15;
+    let mut left: u8;
+    let mut right: u8;
 
     loop {
         left = test_map(player_x + 8 - PLR_BBOX_HWDT, y);
@@ -552,8 +556,8 @@ far fn player_push_out_of_floor() {
 // ============================================================================
 
 far fn player_process_jump(pad: u16) {
-    let dy: i8;
-    let floor1: u8;
+    let mut dy: i8;
+    let mut floor1: u8;
 
     if player_jump == JUMP_NONE {
         // Check for jump button press
@@ -565,7 +569,7 @@ far fn player_process_jump(pad: u16) {
                         player_jump = JUMP_AIR;
                         player_jump_cnt = 0;
                         player_jump_y = player_y;
-                        // TODO: Play jump sound
+                        sfx_play(SFX_CHN, SFX_HERO_JUMP, player_x + 8);
                     } else {
                         player_jump = JUMP_DUMMY;
                     }
@@ -599,21 +603,21 @@ far fn player_process_jump(pad: u16) {
         if player_jump_cnt >= JUMP_TABLE_SIZE {
             player_jump = JUMP_LAND;
             player_fall = TRUE;
-            // TODO: Play fall sound
+            sfx_play(SFX_CHN, SFX_HERO_FALL, player_x);
         }
 
         // Check for floor collision during jump
         if player_jump_cnt > 2 {
-            let i: u8 = 0;
+            let mut i: u8 = 0;
             loop {
                 floor1 = test_map(player_x + 8 - PLR_BBOX_HWDT, player_y + 16 - i);
-                let floor2: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16 - i);
+                let mut floor2: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16 - i);
 
                 if ((floor1 | floor2) & T_SOLID) != 0 {
                     player_jump = JUMP_LAND;
                     player_fall = TRUE;
                     player_y = player_y - i;
-                    // TODO: Play landing sound
+                    sfx_play(SFX_CHN, SFX_HERO_LANDS, player_x);
                     break;
                 }
 
@@ -637,7 +641,7 @@ far fn player_process_airborne() {
         if player_fall_sound < 2 {
             player_fall_sound++;
             if player_fall_sound == 2 {
-                // TODO: Play fall sound
+                sfx_play(SFX_CHN, SFX_HERO_FALL, player_x);
             }
         }
     }
@@ -705,8 +709,8 @@ far fn player_process_hammer() {
     // Display hammer sprites
     let phase_off: u8 = player_hammer_phase * 2;
 
-    let hx: i16 = (player_x as i16) + (hammer_offsets[phase_off] as i16);
-    let hy: i16 = (player_y as i16) + (hammer_offsets[phase_off + 1] as i16);
+    let mut hx: i16 = (player_x as i16) + (hammer_offsets[phase_off] as i16);
+    let mut hy: i16 = (player_y as i16) + (hammer_offsets[phase_off + 1] as i16);
 
     // Clamp positions
     if hx < 0 { hx = 0; }
@@ -734,7 +738,7 @@ far fn player_update_oam() {
 // ============================================================================
 
 far fn player_update(pad: u16) -> u8 {
-    let result: u8 = 0;
+    let mut result: u8 = 0;
 
     // Handle rivet delay countdown
     if player_rivet_delay != 0 {
@@ -796,8 +800,8 @@ far fn player_update(pad: u16) -> u8 {
 // ============================================================================
 
 far fn player_death_animation() {
-    let frame: u8 = 0;
-    let counter: u8 = 0;
+    let mut frame: u8 = 0;
+    let mut counter: u8 = 0;
 
     loop {
         nmi_wait();
