@@ -249,8 +249,8 @@ far fn nmi_wait() {
 // ============================================================================
 
 far fn pad_read_ports() {
-    // Wait for joypad read to complete (use sneslib function)
-    wait_autojoy();
+    // Wait for joypad read to complete (use sneslib macro)
+    wait_autojoy!();
 
     // Read joypad 1
     let current: u16 = (JOY1H as u16) << 8 | (JOY1L as u16);

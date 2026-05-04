@@ -11,9 +11,6 @@
 //   STATUS_C - Carry flag (bit 0)
 //
 // Mode Macros:
-//   modeM16!({ A = 0x0FFF; });
-//   modeM8!({ A = 0xFF; B = 0x0F; });
-//   modeX16!({ X = 0xFFFF; Y = 0x1234; });
 //   modeX8!({ X = 0; Y = 0xFF; });
 
 // ============================================================================
@@ -39,64 +36,158 @@ const STATUS_NVZC: u8 = 0xC3; // Arithmetic result flags
 // ============================================================================
 // Processor Mode Macros
 // ============================================================================
-//
-// These macros temporarily switch processor modes for a block of code,
-// then restore the previous mode. Uses STATUS flag properties.
-//
-// Note: STATUS.A16 = true means 16-bit accumulator (M flag = 0)
-//       STATUS.A16 = false means 8-bit accumulator (M flag = 1)
-//       STATUS.XY16 = true means 16-bit index (X flag = 0)
-//       STATUS.XY16 = false means 8-bit index (X flag = 1)
 
-// Switch to 16-bit accumulator mode, execute block, restore 8-bit
-macro_rules! modeM16($body:tt) {
-    STATUS.A16 = true;
-    $body
-    STATUS.A16 = false;
-}
-
-// Switch to 8-bit accumulator mode, execute block, restore 16-bit
-macro_rules! modeM8($body:tt) {
-    STATUS.A16 = false;
-    $body
-    STATUS.A16 = true;
-}
-
-// Switch to 16-bit index mode, execute block, restore 8-bit
-macro_rules! modeX16($body:tt) {
-    STATUS.XY16 = true;
-    $body
-    STATUS.XY16 = false;
-}
-
-// Switch to 8-bit index mode, execute block, restore 16-bit
+// Switch to 8-bit index mode, execute block, restore
 macro_rules! modeX8($body:tt) {
+    asm!("PHP");
     STATUS.XY16 = false;
     $body
-    STATUS.XY16 = true;
+    asm!("PLP");
 }
 
-// Switch to 16-bit accumulator and index mode, execute block, restore 8-bit
-macro_rules! modeM16X16($body:tt) {
-    STATUS.A16 = true;
-    STATUS.XY16 = true;
+// For interupt handlers save register state. body param may safely execute.
+macro_rules! saveInteruptState($body:tt) {
+    asm!("PHP");
+    asm!("REP #$20");  //Force 16-bit A to save full accumulator
+    asm!("PHA", "PHX", "PHY", "PHD", "PHB");
     $body
-    STATUS.A16 = false;
-    STATUS.XY16 = false;
-}
-
-// Switch to 8-bit accumulator and index mode, execute block, restore 16-bit
-macro_rules! modeM8X8($body:tt) {
-    STATUS.A16 = false;
-    STATUS.XY16 = false;
-    $body
-    STATUS.A16 = true;
-    STATUS.XY16 = true;
+    asm!("PLB", "PLD", "PLY", "PLX");
+    asm!("REP #$20");  // Force 16-bit A to restore full accumulator
+    asm!("PLA");
+    asm!("PLP");
 }
 
 // ============================================================================
-// Boolean Constants (not in stdlib)
+// Critical Section (IRQ Disable)
 // ============================================================================
 
-const FALSE: u8 = 0;
-const TRUE: u8 = 1;
+// Disable interrupts for the duration of `body` and restore the prior I
+// flag state on exit via PHP/PLP. Safe to nest. Use when touching state
+// that an interrupt handler also reads or writes.
+//
+// Overhead: ~11 cycles (PHP + SEI + PLP).
+//
+// Usage:
+//   without_irq!({
+//       shared_counter = shared_counter + 1;
+//   });
+macro_rules! without_irq($body:tt) {
+    asm!("PHP");
+    asm!("SEI");
+    $body
+    asm!("PLP");
+}
+
+// Enable IRQ handling by clearing the I flag.
+// Use once at startup after initialization is complete.
+// Usage: enable_irq!();
+macro_rules! enable_irq() {
+    asm!("CLI");
+}
+
+// Disable IRQ handling by setting the I flag.
+// NMI is unaffected. Prefer without_irq!() for temporary critical sections.
+// Usage: disable_irq!();
+macro_rules! disable_irq() {
+    asm!("SEI");
+}
+
+// Acknowledge a hardware IRQ by reading TIMEUP ($4211), which clears the
+// IRQ flag. Must be called at the start of every #[interrupt(irq)] handler.
+// Usage: irq_ack!();
+macro_rules! irq_ack() {
+    asm!("LDA $4211");
+}
+
+// ============================================================================
+// BCD Arithmetic
+// ============================================================================
+
+// Run `body` with the decimal (D) flag set so that ADC/SBC operate in BCD.
+// PHP/PLP preserves the caller's D flag so nesting is safe. Commonly used
+// for score counters and time-of-day math. The 65816 clears D on interrupt
+// entry, so IRQ/NMI handlers will not accidentally inherit this mode.
+//
+// Usage:
+//   bcd_mode!({
+//       A = A + 1;  // BCD increment
+//       score = A;
+//   });
+macro_rules! bcd_mode($body:tt) {
+    asm!("PHP");
+    asm!("SED");
+    $body
+    asm!("PLP");
+}
+
+// ============================================================================
+// Block Move (MVN)
+// ============================================================================
+
+// Copy a fixed number of bytes from one symbol to another using the 65816
+// hardware block-move instruction (MVN). Roughly 7 cycles/byte, far faster
+// than any hand-rolled loop and the only way to touch this instruction from
+// R65 today.
+//
+// Constraints:
+//   - `src` and `dst` must be symbols whose bank WLA-DX tracks correctly:
+//     RAM statics (.RAMSECTION) or ROM statics (.BANK). Zeropage/lowram
+//     .DEFINE symbols are not supported (WLA-DX returns the wrong bank).
+//   - `len` must be a compile-time literal in 1..=65535.
+//   - MVN copies forward (low→high). If `src` and `dst` overlap and
+//     `dst > src`, the copy will corrupt itself — hand-roll MVP instead.
+//
+// Clobbers: A, X, Y (via the asm!() black-box contract). DBR is saved and
+// restored via PHB/PLB so surrounding near addressing continues to work.
+// The macro leaves A in 8-bit mode on exit.
+//
+// Usage:
+//   static GREETING: [u8; 6] = "Hello\0";
+//   #[ram]
+//   static mut BUFFER: [u8; 6] = [0; 6];
+//   block_move!(GREETING, BUFFER, 6);
+macro_rules! block_move($src:ident, $dst:ident, $len:literal) {
+    const_assert!($len > 0, "block_move: length must be > 0");
+    const_assert!($len <= 0xFFFF, "block_move: length must be <= 65535");
+    asm!(
+        "PHB",
+        "REP #$20",
+        "LDA #{LEN}-1",
+        "LDX #{SRC}",
+        "LDY #{DST}",
+        "MVN :{SRC}, :{DST}",
+        "SEP #$20",
+        "PLB",
+        LEN=$len, SRC=symbol!($src), DST=symbol!($dst)
+    );
+}
+
+// ============================================================================
+// Stack Overflow Guard
+// ============================================================================
+
+// Check the stack pointer against the floor declared by #[stack(lo, hi)]
+// (or the default $0100..$01FF when no attribute is set) and jump to a
+// user-provided handler if S has descended into or below the floor.
+//
+// Typical use: call once per frame from the NMI handler or at the top of
+// the main loop. The handler must be a near function or label in the
+// current bank — the macro emits JMP, not JML.
+//
+// Cost: 8 cycles on the hot path (TSX + CPX + taken BCS). asm!() is
+// treated as a black box by the compiler, so X is spilled automatically
+// if it was live across the check.
+//
+// Usage:
+//   fn overflow_trap() -> ! { loop { } }
+//   stack_guard_check!(overflow_trap);
+macro_rules! stack_guard_check($handler:ident) {
+    asm!(
+        "TSX",
+        "CPX #__R65_STACK_LO",
+        "BCS +",
+        "JMP {HANDLER}",
+        "+:",
+        HANDLER=symbol!($handler)
+    );
+}
