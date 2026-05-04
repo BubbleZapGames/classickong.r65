@@ -1092,10 +1092,20 @@ far fn main() -> ! {
     set_bright(7);
 
     show_logo();
-    
+
+    // Initialize sound — uploads SPC700 driver. Takes a few seconds, so it
+    // overlaps with the logo display. Must run before any music_play / sfx_play.
+    spc_setup();
+
+    global_volume = 127;
+    global_stereo = 1;       // stereo by default; SELECT on title toggles mono
+    game_frame_cnt = 0;
+
+    spc_volume(global_volume);
+    spc_stereo(global_stereo);
+
     fade_screen(0, 0);
 
-    // Skip logo/SPC for fast debugging
     game_init();
 
     // Load shared graphics (use sneslib DMA macro)
@@ -1113,10 +1123,6 @@ far fn main() -> ! {
     game_test_mode = FALSE;
     game_hard_mode = FALSE;
     game_flip = 0;
-
-    global_volume = 127;
-    global_stereo = 1;
-    game_frame_cnt = 0;
 
     // Main game loop
     loop {
