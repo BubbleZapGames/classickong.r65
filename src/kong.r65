@@ -380,10 +380,21 @@ far fn game_show_kong(oam_off: u16, kx: u8, ky: i16) {
         let sy: i16 = ky + (frame[idx + 1] as i16);
         let tile: u16 = frame[idx + 2];
 
-        if sy >= 0 && sy < 240 {
-            oam_spr(sx as u16, sy, tile, off);
+        // Mirrors C original (game_loop.h:223-237):
+        //   if (ky >= 0)        { if (ky < 240) oam_spr1(...); else hide; }
+        //   else /* ky < 0 */   { oam_spr(...); }
+        // Negative ky must draw via oam_spr — that's how Kong climbs off
+        // the top of the screen at the end of cutscene_next_level. oam_spr
+        // also writes the extended-OAM X-high bit (necessary when the
+        // wrapped y places the sprite where the SNES expects valid OAM).
+        if sy >= 0 {
+            if sy < 240 {
+                oam_spr1(sx as u8, sy as u8, tile, off);
+            } else {
+                oam_spr1(0, 240, 0, off);
+            }
         } else {
-            oam_spr1(0, 240, 0, off);
+            oam_spr(sx as u16, sy as u8, tile, off);
         }
 
         off = off + 4;
