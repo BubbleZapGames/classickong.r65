@@ -1104,8 +1104,8 @@ far fn put_str(pos: u16, str: far *u8) {
 far fn put_num(pos: u16, value: u16, digits: u8) {
     // Write decimal number into nametable1 at POS offset, right-aligned.
     // Uses direct nametable1[] access (long addressing) to avoid DBR issues.
-    let mut d: u8 = digits;
     let mut v: u16 = value;
+    let mut d: u8 = digits;
 
     loop {
         if d == 0 {
@@ -1113,7 +1113,7 @@ far fn put_num(pos: u16, value: u16, digits: u8) {
         }
         d--;
 
-        let mut digit: u8 = mod16(v, 10) as u8;
+        let digit: u8 = mod16(v, 10) as u8;
         v = div16(v, 10);
 
         nametable1[pos + (d as u16)] = (0x10 + (digit as u16)) | TEXT_ATR;  // 0x10 = '0' - 32
