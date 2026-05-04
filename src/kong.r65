@@ -61,7 +61,9 @@ static mut kong_frame_bank: u8;
 static mut princess_x: u8;
 
 #[lowram]
-static mut princess_y: u8;
+// Signed so the climb-off-screen path in cutscene_next_level can let
+// princess_y go negative (matches C original's `static int princess_y`).
+static mut princess_y: i16;
 
 
 // ============================================================================
@@ -416,13 +418,27 @@ far fn game_show_princess(frame: u8) {
         flip = SPR_HFLIP;
     }
 
+    // Mirrors C original (game_loop.h:325-339):
+    //   if (princess_y < 224) {
+    //     i = frame << 1;
+    //     if (princess_y >= 0) { oam_spr1(...); oam_spr1(...); }
+    //     else                 { oam_spr(...);  oam_spr(...);  }
+    //   }
+    // The two branches differ only in oam_spr (writes X-high bit in
+    // extended OAM) vs oam_spr1 (skips it).
     if princess_y < 224 {
-        let mut i: u16 = (frame as u16) << 1;
-
-        oam_spr1(princess_x, princess_y,
-                 princess_anim[i] | flip, OAM_PRINCESS);
-        oam_spr1(princess_x, princess_y + 16,
-                 princess_anim[i + 1] | flip, OAM_PRINCESS + 4);
+        let i: u16 = (frame as u16) << 1;
+        if princess_y >= 0 {
+            oam_spr1(princess_x, princess_y as u8,
+                     princess_anim[i] | flip, OAM_PRINCESS);
+            oam_spr1(princess_x, (princess_y + 16) as u8,
+                     princess_anim[i + 1] | flip, OAM_PRINCESS + 4);
+        } else {
+            oam_spr(princess_x as u16, princess_y as u8,
+                    princess_anim[i] | flip, OAM_PRINCESS);
+            oam_spr(princess_x as u16, (princess_y + 16) as u8,
+                    princess_anim[i + 1] | flip, OAM_PRINCESS + 4);
+        }
     }
 
     // Third sprite slot (unused, hide)

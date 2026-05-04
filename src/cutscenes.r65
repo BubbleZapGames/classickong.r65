@@ -586,9 +586,9 @@ far fn cutscene_intro_princess_hold(off: u8, hold: u8, shift: u8) -> u8 {
     if hold != 0 {
         princess_x = kong_x + off;
         if (game_frame_cnt & 8) != 0 {
-            princess_y = kong_y as u8;
+            princess_y = kong_y;
         } else {
-            princess_y = (kong_y - 1) as u8;
+            princess_y = kong_y - 1;
         }
         return 0;
     }
@@ -1051,18 +1051,48 @@ far fn cutscene_next_level() {
 
     delay(25);
 
-    // Kong jumps to ladder and grabs princess (simplified)
+    // Kong jumps from his position to the ladder, grabbing the princess.
+    // C original (cutscenes.h:787-838) uses a `side` variable that flips
+    // for level 1 so Kong faces the correct direction for that level's
+    // mirrored layout. side = game_flip (XOR 1 if game_level == 1).
+    let mut side: u8 = game_flip;
+    if game_level == 1 {
+        side = side ^ 1;
+    }
+
+    let mut x_off: i8;
+    let mut xp_off: i8;
+    if side == 0 {
+        kong_frame_idx = KONG_ANIM_CLIMB1_RIGHT;
+        x_off = 4;
+        xp_off = 24;
+    } else {
+        kong_frame_idx = KONG_ANIM_CLIMB1_LEFT;
+        x_off = -4;
+        xp_off = -8;
+    }
+
     let mut target_x: u8;
     if game_flip == 0 {
         target_x = 76;
     } else {
-        target_x = 192;
+        target_x = 256 - 76 - 32;  // = 148
     }
 
+    let kong_oy: i16 = kong_y + 1;
+    let mut ky: i16 = kong_y << 4;
+    let mut kdy: i16 = -1 << 4;
     let mut hold: u8 = FALSE;
 
     loop {
         nmi_wait();
+
+        ky = ky + kdy;
+        kdy++;
+        kong_y = ky >> 4;
+        if kong_y > kong_oy {
+            kong_y = kong_oy;
+        }
 
         if kong_x < target_x {
             kong_x++;
@@ -1070,19 +1100,23 @@ far fn cutscene_next_level() {
             kong_x--;
         }
 
-        // Grab princess when close
-        if kong_x > 56 && kong_x < 200 {
-            hold = TRUE;
+        // Grab princess when close enough on the relevant side
+        if x_off > 0 {
+            if (game_flip == 0 && kong_x >= 56) ||
+               (game_flip != 0 && kong_x < 256 - 56 - 32) {
+                hold = TRUE;
+            }
+        } else {
+            if (game_flip == 0 && kong_x < 90) ||
+               (game_flip != 0 && kong_x >= 256 - 90 - 32) {
+                hold = TRUE;
+            }
         }
 
-        if hold != 0 {
-            princess_x = kong_x + 24;
-            princess_y = (kong_y as i16 - 8) as u8;
-        }
+        let princess_frame: u8 = cutscene_intro_princess_hold(xp_off as u8, hold, FALSE);
 
-        kong_frame_idx = KONG_ANIM_SIDE_RIGHT;
-        game_show_kong(OAM_KONG, kong_x + 4, kong_y);
-        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+        game_show_kong(OAM_KONG, (kong_x as i16 + x_off as i16) as u8, kong_y);
+        game_show_princess(princess_frame);
 
         game_frame_cnt++;
 
@@ -1091,7 +1125,9 @@ far fn cutscene_next_level() {
         }
     }
 
-    // Kong climbs away
+    // Kong climbs away with the princess. C original (cutscenes.h:842-863)
+    // alternates between Climb1 and Climb2 sprites for the climbing animation
+    // — NOT face frames.
     loop {
         nmi_wait();
 
@@ -1099,17 +1135,24 @@ far fn cutscene_next_level() {
             kong_y--;
         }
 
-        if (game_frame_cnt & 8) != 0 {
-            kong_frame_idx = KONG_ANIM_FACE2_RIGHT;
+        if side != 0 {
+            if (game_frame_cnt & 8) != 0 {
+                kong_frame_idx = KONG_ANIM_CLIMB1_LEFT;
+            } else {
+                kong_frame_idx = KONG_ANIM_CLIMB2_LEFT;
+            }
         } else {
-            kong_frame_idx = KONG_ANIM_FACE3_RIGHT;
+            if (game_frame_cnt & 8) != 0 {
+                kong_frame_idx = KONG_ANIM_CLIMB1_RIGHT;
+            } else {
+                kong_frame_idx = KONG_ANIM_CLIMB2_RIGHT;
+            }
         }
 
-        princess_x = kong_x + 24;
-        princess_y = (kong_y as i16 - 8) as u8;
+        let princess_frame: u8 = cutscene_intro_princess_hold(xp_off as u8, TRUE, FALSE);
 
-        game_show_kong(OAM_KONG, kong_x + 4, kong_y);
-        game_show_princess(0);
+        game_show_kong(OAM_KONG, (kong_x as i16 + x_off as i16) as u8, kong_y);
+        game_show_princess(princess_frame);
 
         game_frame_cnt++;
 
