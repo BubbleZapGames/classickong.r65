@@ -281,11 +281,11 @@ far fn enemy_clear() {
     enemy_free = 0;
     enemy_all = 0;
 
-    // Hide all enemy sprites
+    // Hide all enemy sprites (oam_spr clears the OAM extended X high bit too)
     i = 0;
     loop {
         let mut spr: u16 = OAM_ENEMY + (i << 2);
-        oam_spr1(0, 240, 0, spr);
+        oam_spr(0, 240, 0, spr);
         i++;
         if i >= ENEMY_MAX as u16 {
             break;
@@ -397,9 +397,12 @@ far fn enemy_add(etype: u8, ex: u8, ey: u8, edx: i8) -> u8 {
 far fn enemy_remove(i: u8, destroy: u8) -> u8 {
     let mut fire: u8 = FALSE;
 
-    // Hide sprite
+    // Hide sprite (use oam_spr, not oam_spr1, so the OAM extended X high bit
+    // is cleared too — otherwise a stale high bit from a previous off-screen
+    // cement-pan render renders the slot's next occupant 256 pixels right of
+    // its enemy_x, making it invisible while still lethal).
     let mut spr: u16 = OAM_ENEMY + ((i as u16) << 2);
-    oam_spr1(0, 240, 0, spr);
+    oam_spr(0, 240, 0, spr);
 
     let mut etype: u8 = enemy_type[i];
 
@@ -1014,8 +1017,9 @@ far fn enemy_process() -> u8 {
         let mut etype: u8 = enemy_type[i];
 
         if etype == ENEMY_NONE {
-            // Skip empty slots (no continue to avoid region spill bug)
-            oam_spr1(0, 240, 0, spr);
+            // Skip empty slots (no continue to avoid region spill bug).
+            // oam_spr (not oam_spr1) so the X high bit is cleared.
+            oam_spr(0, 240, 0, spr);
         } else {
 
         let mut ox: u8;
