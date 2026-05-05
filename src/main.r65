@@ -508,11 +508,12 @@ far fn unpack_level() {
                 // Elevator bottom bound
                 elevator_bottom = y as u8;
             } else if n == 0xFC || n == 0xFD {
-                // Elevator platform (down or up)
+                // Elevator platform: 0xFC = moves down (+1), 0xFD = moves up (-1)
+                let dy: i8 = if n == 0xFC { 1 } else { -1 };
                 if game_flip == 0 {
-                    elevator_add((x + 8) as u8, y as u8, n - 0xFC);
+                    elevator_add((x + 8) as u8, y as u8, dy);
                 } else {
-                    elevator_add((x - 16) as u8, y as u8, n - 0xFC);
+                    elevator_add((x - 16) as u8, y as u8, dy);
                 }
             } else if n == 0xFE {
                 // Kong position

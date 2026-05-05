@@ -508,48 +508,57 @@ far fn elevators_process() {
     let mut spr: u16 = OAM_ELEVATORS;
     let mut i: u8 = 0;
 
-    loop {
-        if i >= elevators_all {
-            break;
-        }
+    // Elevator movement gated to once every 4 frames
+    if (game_frame_cnt & 3) == 0 {
+        loop {
+            if i >= elevators_all {
+                break;
+            }
 
-        // Clear old walkmap entry
-        let mut ey: i16 = elevator_y[i];
-        if ey < (elevator_bottom as i16) - 4 {
-            let off: u16 = ((ey as u16) << 5) + ((elevator_x[i] as u16) >> 3);
-            walkmap[off] = 0;
-            walkmap[off + 1] = 0;
-            walkmap[off + 2] = 0;
-        }
+            // Clear old walkmap entry (2x2 cell block)
+            let mut ey: i16 = elevator_y[i];
+            if ey < (elevator_bottom as i16) - 4 {
+                let off: u16 = ((ey as u16) << 5) + ((elevator_x[i] as u16) >> 3);
+                walkmap[off] = 0;
+                walkmap[off + 1] = 0;
+                walkmap[off + 32] = 0;
+                walkmap[off + 33] = 0;
+            }
 
-        // Move elevator
-        elevator_y[i] = ey + elevator_dy[i];
-        ey = elevator_y[i];
-
-        // Wrap around
-        if ey < elevator_top as i16 {
-            elevator_y[i] = elevator_bottom as i16;
+            // Move elevator
+            elevator_y[i] = ey + elevator_dy[i];
             ey = elevator_y[i];
-        }
-        if ey > elevator_bottom as i16 {
-            elevator_y[i] = elevator_top as i16;
-            ey = elevator_y[i];
-        }
 
-        // Set new walkmap entry
-        if ey < (elevator_bottom as i16) - 4 {
-            let off: u16 = ((ey as u16) << 5) + ((elevator_x[i] as u16) >> 3);
-            walkmap[off] = T_ELEVATOR;
-            walkmap[off + 1] = T_ELEVATOR;
-            walkmap[off + 2] = T_ELEVATOR;
+            // Wrap around
+            if ey < elevator_top as i16 {
+                elevator_y[i] = elevator_bottom as i16;
+                ey = elevator_y[i];
+            }
+            if ey > elevator_bottom as i16 {
+                elevator_y[i] = elevator_top as i16;
+                ey = elevator_y[i];
+            }
+
+            // Set new walkmap entry (2x2 cell block)
+            if ey < (elevator_bottom as i16) - 4 {
+                let off: u16 = ((ey as u16) << 5) + ((elevator_x[i] as u16) >> 3);
+                walkmap[off] = T_ELEVATOR;
+                walkmap[off + 1] = T_ELEVATOR;
+                walkmap[off + 32] = T_ELEVATOR;
+                walkmap[off + 33] = T_ELEVATOR;
+            }
+
+            // Draw elevator sprite
+            oam_spr1(elevator_x[i] as u8, (ey - 1) as u8,
+                     ITEMS_TILE + 0x08 | ITEM_ATR, spr);
+
+            spr = spr + 4;
+            i++;
         }
-
-        // Draw elevator sprite
-        oam_spr1(elevator_x[i] as u8, (ey - 1) as u8,
-                 ITEMS_TILE + 0x08 | ITEM_ATR, spr);
-
-        spr = spr + 4;
-        i++;
+    } else {
+        // Skip-frame: still advance spr/i past active elevators
+        i = elevators_all;
+        spr = OAM_ELEVATORS + ((i as u16) << 2);
     }
 
     // Hide unused elevator sprites
