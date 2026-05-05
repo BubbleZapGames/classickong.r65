@@ -717,6 +717,64 @@ far fn kong_process_level2() -> u8 {
         val = 128 - ((game_loops as u16) << 4);
     }
 
+    // Moving ladders: state machine per ladder (0=down, 1=delay, 2=up, 3=delay)
+    let mut li: u8 = 0;
+    loop {
+        if li >= 2 { break; }
+
+        let dir: u8 = ladders_dir[li];
+        if dir == 0 {
+            // Moving down: 1 pixel every 8 frames, 16 pixels total
+            if (game_frame_cnt & 7) == 0 {
+                if ladders_cnt[li] < 16 {
+                    ladders_y[li]++;
+                    ladders_cnt[li]++;
+                } else {
+                    ladders_dir[li] = 1;
+                    ladders_cnt[li] = 64 + ((rand() & 15) as u8) + (li << 4);
+                }
+            }
+        } else if dir == 1 {
+            // Delay before going up
+            if ladders_cnt[li] != 0 {
+                ladders_cnt[li]--;
+            } else {
+                ladders_dir[li] = 2;
+            }
+        } else if dir == 2 {
+            // Moving up: 1 pixel every 4 frames, 16 pixels total
+            if (game_frame_cnt & 3) == 0 {
+                if ladders_cnt[li] < 16 {
+                    ladders_y[li]--;
+                    ladders_cnt[li]++;
+                } else {
+                    ladders_dir[li] = 3;
+                    ladders_cnt[li] = 64 + ((rand() & 15) as u8) + (li << 4);
+                }
+            }
+        } else {
+            // dir == 3: Delay before going down
+            if ladders_cnt[li] != 0 {
+                ladders_cnt[li]--;
+            } else {
+                ladders_dir[li] = 0;
+            }
+        }
+
+        // Push player down if standing above the ladder top (all dirs except 3)
+        if ladders_dir[li] != 3 {
+            let x: u8 = ladders_x[li];
+            let y: u8 = ladders_y[li];
+            if player_x >= x - 4 && player_x < x + 4 {
+                if player_y >= 60 && player_y < y {
+                    player_y++;
+                }
+            }
+        }
+
+        li++;
+    }
+
     if (game_frame_cnt & 1) != 0 {
         // Move Kong on conveyor
         if conveyor_dir[0] != 0 {
