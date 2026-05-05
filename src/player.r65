@@ -322,6 +322,33 @@ far fn player_process_ground(pad: u16) {
     let mut floor1: u8;
     let mut floor2: u8;
 
+    // Conveyor belts (level 2 only) — push player every other frame
+    if game_level == 1 {
+        if (game_frame_cnt & 1) != 0 {
+            let mut j: u8 = 0;
+
+            // Middle belt (y=88): always pushes toward or away from center
+            if player_y == 88 {
+                if conveyor_dir[1] == 0 {
+                    if player_x < 128 { j = 2; } else { j = 1; }
+                } else {
+                    if player_x > 128 { j = 2; } else { j = 1; }
+                }
+            }
+
+            // Bottom belt (y=160)
+            if player_y == 160 {
+                if conveyor_dir[2] == 0 { j = 1; } else { j = 2; }
+            }
+
+            if j == 1 {
+                if player_x > CLIP_LEFT { player_x--; }
+            } else if j == 2 {
+                if player_x < CLIP_RIGHT { player_x++; }
+            }
+        }
+    }
+
     player_dir = DIR_NONE;
 
     // Left movement

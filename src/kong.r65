@@ -709,9 +709,16 @@ far fn kong_process_level2() -> u8 {
 
     kong_stand_animation_level2();
     game_show_kong(OAM_KONG, kong_x, kong_y);
+    game_show_ladders();
 
-    // Move Kong on conveyor
+    // Cement pan spacing: 128 - game_loops*16, clipped to 48 minimum
+    let mut val: u16 = 48;
+    if game_loops < 5 {
+        val = 128 - ((game_loops as u16) << 4);
+    }
+
     if (game_frame_cnt & 1) != 0 {
+        // Move Kong on conveyor
         if conveyor_dir[0] != 0 {
             kong_x++;
         } else {
@@ -721,11 +728,83 @@ far fn kong_process_level2() -> u8 {
         // Change conveyor directions at boundaries
         if kong_x < 26 || kong_x > 200 {
             conveyor_dir[0] = conveyor_dir[0] ^ 1;
-            game_belts_update = TRUE;
+
+            // Flip top conveyor visual (row 7, cols 3..28)
+            let mut ni: u16 = 0;
+            loop {
+                if ni >= 26 { break; }
+                nametable1[POS!(3, 7) + ni] = nametable1[POS!(3, 7) + ni] ^ 0xC;
+                ni++;
+            }
 
             if kong_x < 26 {
                 conveyor_dir[2] = conveyor_dir[2] ^ 1;
                 sfx_play(SFX_CHN+3, SFX_SWITCH, 128);
+
+                // Flip bottom conveyor visual (row 22, all 32 cols)
+                let mut nj: u16 = 0;
+                loop {
+                    if nj >= 32 { break; }
+                    nametable1[POS!(0, 22) + nj] = nametable1[POS!(0, 22) + nj] ^ 0xC;
+                    nj++;
+                }
+            }
+
+            game_belts_update = TRUE;
+        }
+
+        // Middle conveyor occasionally flips direction once unlocked
+        if conveyor_cnt_middle == 0 {
+            if kong_x == 120 {
+                if (rand() & 255) < 64 {
+                    conveyor_dir[1] = conveyor_dir[1] ^ 1;
+                    game_belts_update = TRUE;
+                    sfx_play(SFX_CHN+3, SFX_SWITCH, 128);
+
+                    let mut nk: u16 = 0;
+                    loop {
+                        if nk >= 15 { break; }
+                        nametable1[POS!(0, 13) + nk] = nametable1[POS!(0, 13) + nk] ^ 0xC;
+                        nametable1[POS!(17, 13) + nk] = nametable1[POS!(17, 13) + nk] ^ 0xC;
+                        nk++;
+                    }
+                }
+            }
+        } else {
+            conveyor_cnt_middle--;
+        }
+
+        // Cycle conveyor_cnt[1] and conveyor_cnt[2] (drives pan spawn timing)
+        let mut ci: u8 = 1;
+        loop {
+            if ci >= 3 { break; }
+            if conveyor_dir[ci] != 0 {
+                conveyor_cnt[ci]++;
+                if conveyor_cnt[ci] > val { conveyor_cnt[ci] = 0; }
+            } else {
+                conveyor_cnt[ci]--;
+                if conveyor_cnt[ci] >= val { conveyor_cnt[ci] = val - 1; }
+            }
+            ci++;
+        }
+    } else {
+        if conveyor_cnt[1] == 0 {
+            if conveyor_items[1] < 4 {
+                if conveyor_dir[1] == 0 {
+                    let mut dx1: i8 = 0;
+                    if (rand() & 128) != 0 { dx1 = 1; }
+                    if enemy_add(ENEMY_CEMENT_PAN, 0, 88, dx1) != 0 {
+                        conveyor_items[1]++;
+                    }
+                }
+            }
+        }
+        if conveyor_cnt[2] == 0 {
+            if conveyor_items[2] < 4 {
+                let dx2: i8 = conveyor_dir[2] as i8;
+                if enemy_add(ENEMY_CEMENT_PAN, 0, 160, dx2) != 0 {
+                    conveyor_items[2]++;
+                }
             }
         }
     }
