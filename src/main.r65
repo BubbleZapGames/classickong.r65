@@ -663,6 +663,13 @@ far fn game_loop() -> u8 {
     dma_copy_vram_const!(0, font_gfx_data, 0x1000, 2048);
     dma_copy_vram_const!(7, tileset1_gfx_data, 0x1400, 2048);
     setup_ingame_graphics();
+    // Load animated tileset to VRAM $1800 BEFORE clear_nametables/unpack_level —
+    // set_background() later reads tiles 0x140..0x18F to generate the BG2 mask,
+    // and tiles 0x158..0x18F live in the animated tileset region. Without this
+    // pre-load, pass 1's BG2 mask uses stale anim VRAM (cutscene/prev-level),
+    // producing wrong tiles behind level-3 elevators until a death triggers a
+    // second game_loop pass with the anim VRAM already populated.
+    game_update_vram_animation();
     clear_nametables();
 
     // Unpack level data and build walkmap
