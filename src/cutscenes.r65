@@ -883,9 +883,20 @@ far fn cutscene_levels_clear() {
     game_flip = 0;
 
     set_bright(0);
+    setup_hdma_gradient(0xFF);  // Disable HDMA before VRAM uploads (cutscenes.h:48)
     oam_clear();
 
+    // Reload font + tileset1 — the C original assumes they persist from
+    // main()'s one-time upload, but title_screen overlays $1800-$23FF
+    // (covering the upper half of tileset1 at $1400-$1BFF), so without
+    // this reload BG1 renders garbage tiles for any tile index whose
+    // pattern data lives in that range.
+    dma_copy_vram_const!(0, font_gfx_data, 0x1000, 2048);
+    dma_copy_vram_const!(7, tileset1_gfx_data, 0x1400, 2048);
     setup_ingame_graphics();
+    // Pre-load the animated tileset before set_background reads VRAM
+    // $1400..$18FF for its mask — same fix we applied in game_loop.
+    game_update_vram_animation();
     clear_nametables();
 
     // Load ending map
@@ -900,6 +911,14 @@ far fn cutscene_levels_clear() {
             break;
         }
     }
+
+    // set_background(1) loads tileset1's level-1 palette into palette 1,
+    // pushes back1_gfx into VRAM $4000 (BG2 graphics), and regenerates the
+    // BG2 mask from the BG1 nametable. Without it, palette 1 keeps the
+    // level-4 alt palette so the bridge/platforms render in the wrong
+    // colors and BG2 keeps level-4 graphics as a backdrop. Matches
+    // cutscenes.h:58.
+    set_background(1);
 
     update_nametables();
     setup_palettes();
@@ -918,6 +937,8 @@ far fn cutscene_levels_clear() {
 
     particles_clear();
     kong_frame_idx = KONG_ANIM_FACE1;
+
+    setup_hdma_gradient(6);  // Enable victory-cutscene gradient (cutscenes.h:88)
 
     // Set all sprites to 16x16
     let mut i: u16 = 0;
