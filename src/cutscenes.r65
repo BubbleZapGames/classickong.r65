@@ -943,7 +943,7 @@ far fn cutscene_levels_clear() {
             // Kong pumping animation
             kong_stand_animation_level2();
         } else {
-            // Kong falling sequence (simplified)
+            // Kong falling sequence
             if fall_start == FALSE {
                 fall_start = TRUE;
                 sfx_play(SFX_CHN+2, SFX_KONG_FALLS, 128);
@@ -965,6 +965,19 @@ far fn cutscene_levels_clear() {
             }
 
             kong_y = ky >> 6;
+
+            // Pick the right Kong sprite: alternate falling1/2 every 16
+            // pixels of fall, swap to "fell" once he's hit the ground.
+            // Matches cutscenes.h:169 and cutscenes.h:177.
+            if fall_ground != 0 {
+                kong_frame_idx = KONG_ANIM_FELL;
+            } else {
+                if (kong_y & 16) != 0 {
+                    kong_frame_idx = KONG_ANIM_FALLING1;
+                } else {
+                    kong_frame_idx = KONG_ANIM_FALLING2;
+                }
+            }
         }
 
         game_show_kong(OAM_KONG, kong_x, kong_y);

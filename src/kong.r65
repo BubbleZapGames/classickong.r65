@@ -266,6 +266,33 @@ static kong_climb2_left: [u16; 12] = [
    16, 16, KONG_TILE + 0x6C | KONG_ATR | SPR_HFLIP
 ];
 
+// Kong falling sprites (level-end cutscene). y-offsets are signed; the u16
+// storage is reinterpreted as i16 by game_show_kong's frame[idx+1] as i16.
+// Match game.c:622-644.
+static kong_falling1: [u16; 12] = [
+    0xFFF8 /* -8 */,  8, KONG_TILE + 0x80 | KONG_ATR,
+                  8,  8, KONG_TILE + 0x82 | KONG_ATR,
+                 24,  8, KONG_TILE + 0x84 | KONG_ATR,
+                  8, 24, KONG_TILE + 0x8A | KONG_ATR
+];
+
+static kong_falling2: [u16; 12] = [
+    0xFFF8 /* -8 */,  8, KONG_TILE + 0x84 | KONG_ATR | SPR_HFLIP,
+                  8,  8, KONG_TILE + 0x86 | KONG_ATR,
+                 24,  8, KONG_TILE + 0x80 | KONG_ATR | SPR_HFLIP,
+                  8, 24, KONG_TILE + 0x8E | KONG_ATR
+];
+
+// Fell sprite has only 3 visible sprites; the C original terminates with 128
+// after entry 3. Pad the 4th entry with a y-offset that puts it off-screen
+// (game_show_kong hides any sprite whose final y is >= 240).
+static kong_fell: [u16; 12] = [
+    0xFFF8 /* -8 */,  8, KONG_TILE + 0x88 | KONG_ATR,
+                  8,  8, KONG_TILE + 0x8C | KONG_ATR,
+                 24,  8, KONG_TILE + 0x88 | KONG_ATR | SPR_HFLIP,
+                  0, 240, 0  // hidden — pushes ky+offset off-screen
+];
+
 
 // ============================================================================
 // ANIMATION SEQUENCE INDICES
@@ -291,6 +318,9 @@ const KONG_ANIM_CLIMB1_RIGHT: u8 = 14;
 const KONG_ANIM_CLIMB2_RIGHT: u8 = 15;
 const KONG_ANIM_CLIMB1_LEFT: u8 = 16;
 const KONG_ANIM_CLIMB2_LEFT: u8 = 17;
+const KONG_ANIM_FALLING1: u8 = 18;
+const KONG_ANIM_FALLING2: u8 = 19;
+const KONG_ANIM_FELL: u8 = 20;
 
 // Left-right animation sequence for level 1
 static kong_anim_leftright: [u8; 14] = [
@@ -366,6 +396,12 @@ far fn game_show_kong(oam_off: u16, kx: u8, ky: i16) {
         frame = &kong_climb1_left as far *u16;
     } else if anim_idx == KONG_ANIM_CLIMB2_LEFT {
         frame = &kong_climb2_left as far *u16;
+    } else if anim_idx == KONG_ANIM_FALLING1 {
+        frame = &kong_falling1 as far *u16;
+    } else if anim_idx == KONG_ANIM_FALLING2 {
+        frame = &kong_falling2 as far *u16;
+    } else if anim_idx == KONG_ANIM_FELL {
+        frame = &kong_fell as far *u16;
     } else {
         frame = &kong_face1 as far *u16;
     }
