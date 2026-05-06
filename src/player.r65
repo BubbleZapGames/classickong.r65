@@ -373,6 +373,42 @@ far fn player_process_ground(pad: u16) {
         }
     }
 
+    // Remove a rivet when the player is standing on it (level 4).
+    // Matches game_loop.h:1091-1129 in the C original.
+    let rx: u8 = player_x + 8;
+    let ry: u8 = player_y + 16;
+    if (test_map(rx, ry as u16) & T_RIVET) != 0 {
+        let nm_off: u16 = NAM_OFF!(rx, ry);
+
+        nametable1[nm_off] = 0x144 | BG_PAL!(1);
+        // Mark the two tiles as walls so fireballs treat the gap as a rivet stub
+        map[nm_off] = 0xF5;
+        map[nm_off - 32] = 0xF5;
+
+        // Particles centered on the (now removed) rivet tile, offset -4
+        let px: u8 = ((nm_off & 31) << 3) as u8 - 4;
+        let py: u8 = ((nm_off >> 5) << 3) as u8 - 4;
+        particle_add(PART_TYPE_SMOKE, px, py);
+        particle_add(PART_TYPE_100, px, py - 8);
+
+        game_add_score(100);
+
+        // Clear the 8 walkmap rows under the player's foot
+        let mut w_off: u16 = WMAP_OFF!(rx, ry);
+        let mut wj: u8 = 0;
+        loop {
+            if wj >= 8 { break; }
+            walkmap[w_off] = 0;
+            w_off = w_off + 32;
+            wj++;
+        }
+
+        game_rivets++;
+        sfx_play(SFX_CHN, SFX_RIVET, rx);
+        player_rivet_delay = 10;  // hold off gravity briefly so the player can step off
+        game_rivets_update = TRUE;
+    }
+
     // Update walk animation based on direction. The else-branch (idle on
     // ground) is needed so that landing from a jump without holding a
     // direction resets the sprite from the airborne jump-frame back to the
