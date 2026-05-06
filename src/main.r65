@@ -298,7 +298,7 @@ far fn show_logo() {
 
     // Fade in
     let mut bright: u8 = 0;
-    let mut pixel: u8 = 0;
+    let mut pixel: u8 = 34;
 
     loop {
         nmi_wait();
@@ -309,9 +309,9 @@ far fn show_logo() {
         }
 
         set_pixelize(pixel >> 1, Screen::BG1 as u16 | Screen::BG2 as u16);
-        pixel++;
+        pixel--;
 
-        if pixel >= 34 {
+        if pixel <= 0 {
             break;
         }
     }

@@ -40,7 +40,7 @@ static str_press_start: [u8; 12] = "PRESS START";
 static str_blank_11: [u8; 12] = "           ";
 static str_score: [u8; 13] = "SCORE:000000";
 static str_best: [u8; 12] = "BEST:000000";
-static str_copyright: [u8; 16] = "@2012 BUBBLEZAP";
+static str_copyright: [u8; 16] = "@2026 BUBBLEZAP";
 static str_how_high: [u8; 23] = "HOW HIGH CAN YOU GET ?";
 
 // Sound test strings
@@ -1129,7 +1129,7 @@ far fn cutscene_levels_clear() {
             princess_frame = 0;
         }
 
-        // Once the bridge is mostly built, Mario and princess walk toward
+        // Once the bridge is mostly built, player and princess walk toward
         // each other. While walking, princess uses frame 1 (= walking).
         if frame > 480 {
             if mod16(frame, 3) == 0 {
