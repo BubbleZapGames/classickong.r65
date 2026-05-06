@@ -13,6 +13,13 @@
 #[ram]
 static mut platform_anim_cnt: [u8; 192];  // 6*32 for bending platforms
 
+// Falling-platform state for the level-end cutscene (cutscene_levels_clear).
+#[ram]
+static mut platform_y: [u8; 4];
+
+#[ram]
+static mut platform_hit: [u8; 4];
+
 // Sound mode strings
 static sound_mode_blank: [u8; 12] = "           ";
 static sound_mode_mono: [u8; 12] = " MONO MODE ";
@@ -929,9 +936,45 @@ far fn cutscene_levels_clear() {
     let mut fall_ground: u8 = FALSE;
     let mut ky: i16 = (23 as i16) << 6;
     let mut kdy: i16 = 0;
+    let mut bounce_cnt: u8 = 0;
+    let mut shake_cnt: u8 = 0;
+    let mut nm_ptr: u16 = 0xF7;     // bridge tile cursor (decrements)
+    let mut princess_frame: u8 = 0;
+
+    // Platform Y positions; platform 0 starts the fall when it crosses 200
+    // and the others stack on top. Stored in module-level statics because
+    // R65 doesn't support local arrays.
+    platform_y[0] = 55;
+    platform_y[1] = 55 + 40;
+    platform_y[2] = 55 + 80;
+    platform_y[3] = 55 + 120;
+    platform_hit[0] = 0;
+    platform_hit[1] = 0;
+    platform_hit[2] = 0;
+    platform_hit[3] = 0;
 
     loop {
         nmi_wait();
+
+        // Push the bridge area of the nametable (row 7, cols 8..23) every
+        // frame so the in-progress bridge formation actually appears in VRAM.
+        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 7) * 2, 0x7E);
+        copy_to_vram(POS!(8, 7), 16 * 2);
+
+        // Screen shake when Kong hits the ground (cutscenes.h:107-126).
+        if shake_cnt != 0 {
+            shake_cnt--;
+            if (shake_cnt & 2) != 0 {
+                set_scroll_layer(0, 0xFFFF, 0xFFFF);  // -1, -1
+                set_scroll_layer(1, 0xFFFE, 0xFFFE);  // -2, -2
+            } else {
+                set_scroll_layer(0, 1, 1);
+                set_scroll_layer(1, 0, 0);
+            }
+        } else {
+            set_scroll_layer(0, 0, 0);
+            set_scroll_layer(1, 0xFFFF, 0xFFFF);
+        }
 
         // Fade in
         if bright < 15 {
@@ -943,49 +986,104 @@ far fn cutscene_levels_clear() {
             // Kong pumping animation
             kong_stand_animation_level2();
         } else {
-            // Kong falling sequence
-            if fall_start == FALSE {
-                fall_start = TRUE;
-                sfx_play(SFX_CHN+2, SFX_KONG_FALLS, 128);
-            }
+            // Kong only starts falling once the top platform has slid down
+            // past y=200; until then, just lower platform 0 by 2 px/frame.
+            if platform_y[0] >= 200 {
+                if bounce_cnt < 5 {
+                    if fall_start == FALSE {
+                        fall_start = TRUE;
+                        sfx_play(SFX_CHN+2, SFX_KONG_FALLS, 128);
+                    }
 
-            ky = ky + kdy;
-            if kdy < 128 {
-                kdy = kdy + 6;
-            }
+                    ky = ky + kdy;
+                    if kdy < (2 << 6) {
+                        kdy = kdy + 6;
+                    }
 
-            if ky >= (182 << 6) {
-                ky = 182 << 6;
-                kdy = 0;
+                    if ky >= (182 << 6) {
+                        ky = 182 << 6;
 
-                if fall_ground == FALSE {
-                    fall_ground = TRUE;
-                    sfx_play(SFX_CHN+2, SFX_KONG_LANDS, 128);
+                        // Inverse-with-dampening — C uses 0-((kdy<<6)/96),
+                        // which is ≈ -2*kdy/3. Approximate with shifts that
+                        // converge on 2/3: 1/2 + 1/8 + 1/32 = 0.65625.
+                        let dampened: i16 = (kdy >> 1) + (kdy >> 3) + (kdy >> 5);
+                        kdy = 0 - dampened;
+                        bounce_cnt++;
+
+                        if fall_ground == FALSE {
+                            fall_ground = TRUE;
+                            kong_frame_idx = KONG_ANIM_FELL;
+                            sfx_play(SFX_CHN+2, SFX_KONG_LANDS, 128);
+                            shake_cnt = 25;
+                        }
+                    }
+
+                    if fall_ground == FALSE {
+                        kong_y = ky >> 6;
+                        if (kong_y & 16) != 0 {
+                            kong_frame_idx = KONG_ANIM_FALLING1;
+                        } else {
+                            kong_frame_idx = KONG_ANIM_FALLING2;
+                        }
+                    }
                 }
+            } else {
+                platform_y[0] = platform_y[0] + 2;
+            }
+
+            // Move platforms 1..3 — each stacks on top of the platform
+            // above and triggers SFX_RAFT_FALL on first contact (with
+            // either the previous platform or the floor).
+            let mut pi: u8 = 0;
+            loop {
+                if pi >= 4 { break; }
+                if platform_y[pi] < 200 {
+                    if pi != 0 && platform_y[pi] < platform_y[pi - 1] + 8 {
+                        if platform_hit[pi] == 0 {
+                            platform_hit[pi] = 1;
+                            sfx_play(SFX_CHN+3, SFX_RAFT_FALL, 128);
+                        }
+                        platform_y[pi] = platform_y[pi - 1] + 8;
+                    }
+                } else {
+                    if platform_hit[pi] < 2 {
+                        platform_hit[pi] = 2;
+                        sfx_play(SFX_CHN+3, SFX_RAFT_FALL, 128);
+                    }
+                }
+                pi++;
             }
 
             kong_y = ky >> 6;
-
-            // Pick the right Kong sprite: alternate falling1/2 every 16
-            // pixels of fall, swap to "fell" once he's hit the ground.
-            // Matches cutscenes.h:169 and cutscenes.h:177.
-            if fall_ground != 0 {
-                kong_frame_idx = KONG_ANIM_FELL;
-            } else {
-                if (kong_y & 16) != 0 {
-                    kong_frame_idx = KONG_ANIM_FALLING1;
-                } else {
-                    kong_frame_idx = KONG_ANIM_FALLING2;
-                }
-            }
         }
 
         game_show_kong(OAM_KONG, kong_x, kong_y);
-        game_show_princess((game_frame_cnt >> 4) as u8 & 2);
+        game_show_princess(princess_frame);
 
-        // Draw player
-        let player_tile: u16 = PLAYER_TILE + ((player_x >> 1) & 3) as u16 * 2;
-        oam_spr1(player_x, player_y, player_tile | PLAYER_ATR, OAM_PLAYER);
+        // Player sprite uses the proper walk-left animation indexed by
+        // (player_x >> 1) & 3 (matches game_loop.h:220's playerWalkAnimLeft).
+        oam_spr1(player_x, player_y,
+                 player_walk_anim_left[((player_x >> 1) & 3) as u8],
+                 OAM_PLAYER);
+
+        // Draw the four falling platforms — 7 sprites each, 16 px apart,
+        // starting at x=72.
+        let mut pl_spr: u16 = OAM_PLATFORMS;
+        let mut pi2: u8 = 0;
+        loop {
+            if pi2 >= 4 { break; }
+            let mut pl_x: u8 = 72;
+            let mut pj: u8 = 0;
+            loop {
+                if pj >= 7 { break; }
+                oam_spr1(pl_x, platform_y[pi2],
+                         PLAYER_TILE + 0x4E | PLAYER_ATR, pl_spr);
+                pl_x = pl_x + 16;
+                pl_spr = pl_spr + 4;
+                pj++;
+            }
+            pi2++;
+        }
 
         particle_process();
 
@@ -994,7 +1092,24 @@ far fn cutscene_levels_clear() {
             music_play(MUS_VICTORY);
         }
 
-        // Mario and princess walk toward each other
+        // Append a bridge tile every 4 frames once the fall is well underway,
+        // matches cutscenes.h:244-250. Tile 0x145 with palette 1 + priority.
+        if frame > 420 && (frame & 3) == 0 {
+            if nm_ptr > 0xE7 {
+                nametable1[nm_ptr] = 0x0145 | BG_PAL!(1) | BG_PRI;
+                nm_ptr--;
+            }
+        }
+
+        // Default princess frame: blink between 0 and 2 every 32 frames.
+        if (game_frame_cnt & 32) != 0 {
+            princess_frame = 2;
+        } else {
+            princess_frame = 0;
+        }
+
+        // Once the bridge is mostly built, Mario and princess walk toward
+        // each other. While walking, princess uses frame 1 (= walking).
         if frame > 480 {
             if mod16(frame, 3) == 0 {
                 if princess_x < 96 {
@@ -1002,6 +1117,13 @@ far fn cutscene_levels_clear() {
                 }
                 if player_x > 144 {
                     player_x--;
+                }
+            }
+            if princess_x < 96 {
+                if (game_frame_cnt & 8) != 0 {
+                    princess_frame = 1;
+                } else {
+                    princess_frame = 0;
                 }
             }
         }
@@ -1012,11 +1134,17 @@ far fn cutscene_levels_clear() {
             sfx_play(SFX_CHN+3, SFX_LOVE, 128);
         }
 
-        // Final walk together
+        // Final walk together — faster (every other frame instead of every
+        // third), and re-enable princess walk frame.
         if frame > 810 {
             if (frame & 1) != 0 {
                 princess_x++;
                 player_x--;
+            }
+            if (game_frame_cnt & 8) != 0 {
+                princess_frame = 1;
+            } else {
+                princess_frame = 0;
             }
         }
 

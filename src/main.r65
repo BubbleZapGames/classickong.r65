@@ -177,6 +177,7 @@ const OAM_BARRELS: u16 = 44 << 2;     // 5 sprites
 const OAM_KONG: u16 = 49 << 2;        // 5 sprites
 const OAM_PRINCESS: u16 = 54 << 2;    // 3 sprites
 const OAM_LADDERS: u16 = 57 << 2;     // 2 sprites
+const OAM_PLATFORMS: u16 = 64 << 2;   // 28 sprites (4 platforms × 7) — levels-clear cutscene
 
 
 // ============================================================================
