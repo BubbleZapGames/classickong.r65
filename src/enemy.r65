@@ -867,7 +867,11 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
 // ============================================================================
 
 far fn process_bounce(i: u8, spr: u16) -> u8 {
-    let mut ox: u8 = (enemy_ix[i] >> BOUNCE_FP) as u8;
+    // Keep the i16 raw_x for the OAM call so oam_spr can read the X-high bit
+    // and park a left-of-screen bouncer at OAM X≥256 (off the right edge).
+    // The u8 ox is only used for collision/bounce-zone arithmetic.
+    let raw_x: i16 = enemy_ix[i] >> BOUNCE_FP;
+    let mut ox: u8 = raw_x as u8;
     let mut oy: u8 = (enemy_iy[i] >> BOUNCE_FP) as u8;
 
     // Draw sprite
@@ -877,7 +881,7 @@ far fn process_bounce(i: u8, spr: u16) -> u8 {
     } else {
         tile = ENEMY_TILE | ENEMY_ATR;
     }
-    oam_spr(ox as u16, oy as i16, tile, spr);
+    oam_spr(raw_x as u16, oy as i16, tile, spr);
 
     // Physics
     if enemy_idy[i] < (3 << BOUNCE_FP) {
