@@ -981,13 +981,9 @@ far fn enemy_check_hammer_collision(i: u8, ox: u8, oy: u8) -> u8 {
         return FALSE;
     }
 
-    // Calculate hammer position
-    let mut hammer_off: u8;
-    if player_dir_prev == DIR_LEFT {
-        hammer_off = player_hammer_phase * 2;
-    } else {
-        hammer_off = (player_hammer_phase + 2) * 2;
-    }
+    // Calculate hammer position — match the index used by player_process_hammer
+    // so the collision hitbox tracks the visible hammer sprite.
+    let hammer_off: u8 = player_hammer_phase * 2;
 
     let hx: u8 = (player_x as i16 + hammer_offsets[hammer_off] as i16 + 3) as u8;
     let hy: u8 = (player_y as i16 + hammer_offsets[hammer_off + 1] as i16 + 3) as u8;
