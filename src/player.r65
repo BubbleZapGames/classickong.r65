@@ -373,13 +373,24 @@ far fn player_process_ground(pad: u16) {
         }
     }
 
-    // Update walk animation based on direction
+    // Update walk animation based on direction. The else-branch (idle on
+    // ground) is needed so that landing from a jump without holding a
+    // direction resets the sprite from the airborne jump-frame back to the
+    // standing frame; the C original leaves player_anim untouched here, so
+    // it would stay stuck in the jump pose until the player walked.
     if player_dir == DIR_LEFT {
         let mut frame: u8 = mod8((player_step >> 2) as u8, 6);
         player_anim = player_walk_anim_left[frame];
     } else if player_dir == DIR_RIGHT {
         let mut frame: u8 = mod8((player_step >> 2) as u8, 6);
         player_anim = player_walk_anim_right[frame];
+    } else {
+        // Idle: standing frame, facing the previous direction
+        if player_dir_prev == DIR_LEFT {
+            player_anim = player_walk_anim_left[0];
+        } else {
+            player_anim = player_walk_anim_right[0];
+        }
     }
 }
 
