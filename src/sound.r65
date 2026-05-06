@@ -339,6 +339,13 @@ far fn music_play(mus: u8) {
         music_size = MUSIC_VICTORY_SIZE;
     }
 
+    // Match C original (game.c:926-933): halt the previous music BEFORE
+    // reloading, then explicitly restore global_volume after the load (the
+    // load path uses snes_spc_volume which may have been faded to 0 by
+    // fade_screen). Without the explicit volume restore, the new track
+    // plays inaudibly when called from the post-fade victory cutscene.
+    music_stop();
     spc_load_music(music_data, music_size);
+    spc_volume(global_volume);
     music_start();
 }

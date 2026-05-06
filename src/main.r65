@@ -323,6 +323,7 @@ far fn show_logo() {
 
 far fn fade_screen(fade_in: u8, with_sound: u8) {
     let mut level: u8 = 1;
+    let mut volume: i16 = 127;
 
     loop {
         nmi_wait();
@@ -331,12 +332,27 @@ far fn fade_screen(fade_in: u8, with_sound: u8) {
             set_bright(level);
         } else {
             set_bright(15 - level);
+
+            // Fade out sound in step with brightness — matches game.c:998-1003
+            if with_sound != 0 {
+                volume = volume - 8;
+                if volume < 0 {
+                    volume = 0;
+                }
+                spc_volume(volume as u8);
+            }
         }
 
         level++;
         if level >= 16 {
             break;
         }
+    }
+
+    // After fading out with sound, halt the music so the next music_play
+    // starts cleanly instead of layering over the previous track.
+    if fade_in == 0 && with_sound != 0 {
+        music_stop();
     }
 }
 
