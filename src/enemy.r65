@@ -299,7 +299,11 @@ far fn enemy_clear() {
 // Returns TRUE if successful, FALSE if no room
 // ============================================================================
 
-far fn enemy_add(etype: u8, ex: u8, ey: u8, edx: i8) -> u8 {
+// ex is i16 (matches C's `int x`) so the level-3 bouncer spawn can pass
+// negative values like -16 without sign loss — without this the bouncer's
+// fixed-point ix wraps and the bouncer gets stuck in the ix<0 suppression
+// branch (never removed, so springs accumulate each spawn).
+far fn enemy_add(etype: u8, ex: i16, ey: u8, edx: i8) -> u8 {
     let mut i: u8 = enemy_free;
     let mut j: u8 = 0;
 
@@ -338,7 +342,7 @@ far fn enemy_add(etype: u8, ex: u8, ey: u8, edx: i8) -> u8 {
             }
         }
 
-        enemy_x[i] = ex;
+        enemy_x[i] = ex as u8;
         enemy_y[i] = ey;
         enemy_dx[i] = dx;
         enemy_fall[i] = 0;
@@ -346,28 +350,28 @@ far fn enemy_add(etype: u8, ex: u8, ey: u8, edx: i8) -> u8 {
         enemy_land[i] = 255;
     } else if etype == ENEMY_FIREBALL_1_JUMP_IN || etype == ENEMY_FIREBALL_1_SPAWN {
         // Fireball spawn types
-        enemy_x[i] = ex;
+        enemy_x[i] = ex as u8;
         enemy_y[i] = ey - 2;
         enemy_dx[i] = edx;
         enemy_cnt[i] = 0;
         enemy_ladder[i] = DIR_NONE;
     } else if etype == ENEMY_FIREBALL_1 || etype == ENEMY_FIREBALL_2 {
         // Active fireballs
-        enemy_x[i] = ex;
+        enemy_x[i] = ex as u8;
         enemy_y[i] = ey;
         enemy_dx[i] = edx;
         enemy_cnt[i] = 8 + ((rand() as u8) & 7);
         enemy_ladder[i] = DIR_NONE;
         enemy_spawn[i] = 0;
     } else if etype == ENEMY_BOUNCE {
-        // Bouncing enemy
-        enemy_ix[i] = (ex as i16) << BOUNCE_FP;
+        // Bouncing enemy — preserve sign of ex (C uses int)
+        enemy_ix[i] = ex << BOUNCE_FP;
         enemy_iy[i] = (ey as i16) << BOUNCE_FP;
         enemy_sy[i] = ey;
         enemy_idy[i] = -3 << BOUNCE_FP;
         enemy_land[i] = 0;
         enemy_speed[i] = game_bounce_speed << 1;
-        sfx_play(SFX_CHN+2, SFX_BOUNCE_JUMP, ex);
+        sfx_play(SFX_CHN+2, SFX_BOUNCE_JUMP, ex as u8);
     } else if etype == ENEMY_CEMENT_PAN {
         // Cement pan on conveyor
         if edx != 0 {
@@ -917,14 +921,17 @@ far fn process_bounce(i: u8, spr: u16) -> u8 {
         enemy_land[i]--;
     }
 
-    // Check for removal
-    if enemy_ix[i] < 0 {
-        return FALSE;  // Prevent collision at edge
-    }
-
+    // Check for removal first — bouncer must be removable even while its
+    // ix is "off-screen-left" (negative), otherwise after the if-block
+    // freezes ix the bouncer can keep bouncing forever and never reach
+    // this check. Matches C source order: removal then suppression.
     if enemy_iy[i] >= (224 << BOUNCE_FP) {
         enemy_remove(i, FALSE);
         return FALSE;
+    }
+
+    if enemy_ix[i] < 0 {
+        return FALSE;  // Suppress collision at edge (sprite still drawn)
     }
 
     return TRUE;

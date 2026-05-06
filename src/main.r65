@@ -488,7 +488,7 @@ far fn unpack_level() {
                 }
             } else if n == 0xF4 {
                 // Initial fireball
-                enemy_add(ENEMY_FIREBALL_1, (x - 4) as u16, y, 0);
+                enemy_add(ENEMY_FIREBALL_1, (x - 4) as i16, y as u8, 0);
             } else if n == 0xF6 {
                 // Hammer
                 game_item_add((x - 4) as u8, (y - 4) as u8, ITEM_HAMMER);

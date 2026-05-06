@@ -929,12 +929,11 @@ far fn kong_process_level3() -> u8 {
         game_bounce_delay = val as u16;
 
         let random_off: u8 = mod8(rand() as u8, (game_loops + 1) as u8) & 7;
-        let mut bounce_x: u8;
-        if game_flip == 0 {
-            bounce_x = (-16 + (random_off as i8)) as u8;
+        let bounce_x: i16 = if game_flip == 0 {
+            -16 + (random_off as i16)
         } else {
-            bounce_x = 256 - (random_off as u16) as u8;
-        }
+            256 - (random_off as i16)
+        };
 
         enemy_add(ENEMY_BOUNCE, bounce_x, (kong_y + 18) as u8, 0);
     } else {
