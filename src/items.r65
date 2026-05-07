@@ -409,6 +409,8 @@ far fn items_check_collision() -> u8 {
                             anim = TRUE;
 
                             player_hammer_time = 600;  // 10 seconds at 60fps
+                            player_hammer_phase = 0;   // game_loop.h:384
+                            player_hammer_cnt = 0;     // game_loop.h:385
                             sfx_play(SFX_CHN + 3, SFX_ITEM, player_x + 8);
                             music_play(MUS_HAMMER);
                         }

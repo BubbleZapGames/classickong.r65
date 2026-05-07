@@ -762,38 +762,34 @@ far fn player_process_hammer() {
         return;
     }
 
-    // Decrease hammer timer
+    // ---- Draw using current state ----
+    // Direction-aware index into hammer_offsets / hammer_sprites.
+    // LEFT facing  → pairs 0..1 (left side, top)
+    // RIGHT facing → pairs 2..3 (right side, top)
+    let mut off: u8 = player_hammer_phase * 2;
+    if player_dir_prev != DIR_LEFT { off = off + 4; }
+
+    let hx: i16 = (player_x as i16) + (hammer_offsets[off] as i16);
+    let hy: i16 = (player_y as i16) + (hammer_offsets[off + 1] as i16);
+
+    oam_spr1(hx as u8, hy as u8, hammer_sprites[off], OAM_HAMMER);
+    oam_spr1(player_x, player_y, hammer_sprites[off + 1], OAM_HAMMER + 4);
+
+    // ---- Update timer / phase (matches game_loop.h:1477, palette flash omitted) ----
     player_hammer_time--;
 
     if player_hammer_time == 0 {
-        // Hammer expired - play normal music
+        // Hammer expired — resume level music.
         music_play(MUS_LEVEL1);
-    }
-
-    // Animate hammer
-    player_hammer_cnt++;
-    if player_hammer_cnt >= 6 {
-        player_hammer_cnt = 0;
-        player_hammer_phase++;
-        if player_hammer_phase >= 4 {
-            player_hammer_phase = 0;
+    } else {
+        // Phase toggles 0/1: 6 frames at side (phase 0), 4 frames at top (phase 1).
+        player_hammer_cnt++;
+        if (player_hammer_phase != 0 && player_hammer_cnt == 4) ||
+           (player_hammer_phase == 0 && player_hammer_cnt == 6) {
+            player_hammer_phase = player_hammer_phase ^ 1;
+            player_hammer_cnt = 0;
         }
     }
-
-    // Display hammer sprites
-    let phase_off: u8 = player_hammer_phase * 2;
-
-    let mut hx: i16 = (player_x as i16) + (hammer_offsets[phase_off] as i16);
-    let mut hy: i16 = (player_y as i16) + (hammer_offsets[phase_off + 1] as i16);
-
-    // Clamp positions
-    if hx < 0 { hx = 0; }
-    if hx > 255 { hx = 255; }
-    if hy < 0 { hy = 0; }
-    if hy > 239 { hy = 240; }
-
-    oam_spr1(hx as u8, hy as u8, hammer_sprites[phase_off], OAM_HAMMER);
-    oam_spr1(player_x, player_y, hammer_sprites[phase_off + 1], OAM_HAMMER + 4);
 }
 
 

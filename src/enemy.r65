@@ -983,7 +983,9 @@ far fn enemy_check_hammer_collision(i: u8, ox: u8, oy: u8) -> u8 {
 
     // Calculate hammer position — match the index used by player_process_hammer
     // so the collision hitbox tracks the visible hammer sprite.
-    let hammer_off: u8 = player_hammer_phase * 2;
+    // LEFT facing → pairs 0..1; RIGHT facing → pairs 2..3.
+    let mut hammer_off: u8 = player_hammer_phase * 2;
+    if player_dir_prev != DIR_LEFT { hammer_off = hammer_off + 4; }
 
     let hx: u8 = (player_x as i16 + hammer_offsets[hammer_off] as i16 + 3) as u8;
     let hy: u8 = (player_y as i16 + hammer_offsets[hammer_off + 1] as i16 + 3) as u8;
@@ -1145,26 +1147,31 @@ far fn enemy_process() -> u8 {
             }
         }
 
-        // Check collisions if enemy still active
+        // Check collisions if enemy still active.
+        // Match original (enemy.h:702): alternate between player-collision and
+        // hammer-collision checks each frame. Without alternation, the player
+        // dies on contact even when the hammer should destroy the enemy first.
         if etype != ENEMY_NONE {
-            // Check player collision
-            if enemy_check_player_collision(ox, oy) != 0 {
-                clear = LEVEL_LOSE;
-            }
-
-            // Check hammer collision
-            if enemy_check_hammer_collision(i, ox, oy) != 0 {
-                // Enemy destroyed by hammer — fireballs give 500, rest give 300
-                let mut score: u16 = 300;
-                let mut particle: u8 = PART_TYPE_300;
-                if etype == ENEMY_FIREBALL_1 || etype == ENEMY_FIREBALL_2 ||
-                   etype == ENEMY_FIREBALL_1_JUMP_IN || etype == ENEMY_FIREBALL_1_SPAWN {
-                    score = 500;
-                    particle = PART_TYPE_500;
+            if (game_frame_cnt & 1) != 0 {
+                // Odd frames: check player collision
+                if enemy_check_player_collision(ox, oy) != 0 {
+                    clear = LEVEL_LOSE;
                 }
-                game_add_score(score);
-                particle_add(particle, ox, oy);
-                enemy_remove(i, TRUE);
+            } else {
+                // Even frames: check hammer collision
+                if enemy_check_hammer_collision(i, ox, oy) != 0 {
+                    // Enemy destroyed by hammer — fireballs give 500, rest give 300
+                    let mut score: u16 = 300;
+                    let mut particle: u8 = PART_TYPE_300;
+                    if etype == ENEMY_FIREBALL_1 || etype == ENEMY_FIREBALL_2 ||
+                       etype == ENEMY_FIREBALL_1_JUMP_IN || etype == ENEMY_FIREBALL_1_SPAWN {
+                        score = 500;
+                        particle = PART_TYPE_500;
+                    }
+                    game_add_score(score);
+                    particle_add(particle, ox, oy);
+                    enemy_remove(i, TRUE);
+                }
             }
         }
 
