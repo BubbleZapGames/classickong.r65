@@ -1,11 +1,15 @@
 // ============================================================================
-// Hardware Initialization - Placed in bank 5 to avoid bank 0 overflow
+// Hardware Initialization
 // ============================================================================
 // This module provides comprehensive PPU/CPU register initialization
 // matching the original ROM's startup sequence.
+//
+// Placed via #[bank(auto)] so the compiler picks a bank above the highest
+// explicit one — bank 5 is shared with level data and bumps over 32 KB at
+// -O2. All three functions here are `far fn`, which auto-bank requires.
 // ============================================================================
 
-#[bank(5)]
+#[bank(auto)]
 
 // Full PPU register initialization
 // Initializes all PPU registers to safe defaults (matching original ROM)
