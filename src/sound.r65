@@ -4,7 +4,7 @@
 // SPC700 communication for music and sound effects
 // ============================================================================
 
-#[bank(0)]
+#[bank(auto)]
 
 // ============================================================================
 // APU REGISTERS (SNES Audio Processing Unit I/O Ports)

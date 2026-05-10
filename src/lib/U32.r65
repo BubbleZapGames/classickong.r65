@@ -8,6 +8,8 @@
 
 include!("math.r65")
 
+#[bank(auto)]
+
 // ============================================================================
 // U32 (32-bit Unsigned Integer) Support
 // ============================================================================
@@ -655,7 +657,7 @@ static mut __u32_tostr_tmp: U32;
 static mut __u32_tostr_digits: [u8; 11];
 
 impl ToString for U32 {
-    fn to_string(far *self, buf: far *u8) -> u16 {
+    far fn to_string(far *self, buf: far *u8) -> u16 {
         __u32_tostr_tmp.lo = self.lo;
         __u32_tostr_tmp.hi = self.hi;
         if __u32_tostr_tmp.hi == 0 && __u32_tostr_tmp.lo == 0 {
