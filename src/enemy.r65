@@ -764,10 +764,13 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
                     }
                 }
 
-                // Move
-                if enemy_dx[i] > 0 {
+                // Move using the LOCAL dx snapshot — matches C enemy.h:483
+                // `ox+=dx;` which uses the value BEFORE the bounce check
+                // wrote enemy_dx. Reading enemy_dx[i] here would reverse on
+                // the same frame, accumulating a 1-pixel drift per bounce.
+                if dx == 1 {
                     ox++;
-                } else if enemy_dx[i] < 0 {
+                } else {
                     ox--;
                 }
 
@@ -807,8 +810,14 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
                 }
             }
         } else {
-            // Check for ladder
+            // Check for ladder. Order matches C (enemy.h:514-552): try DOWN
+            // first; if taken, skip the UP check this frame. Without the
+            // early-out the UP rand check still fires (desyncs the RNG vs C)
+            // and can overwrite DIR_DOWN with DIR_UP when both ladders are
+            // present at this position.
             if (ox & 7) == 4 {
+                let mut ladder_taken: u8 = FALSE;
+
                 // Check down
                 let ladder_down: u8 = test_map(ox + 8, oy + 16);
                 if (ladder_down & T_LADDER) != 0 {
@@ -820,20 +829,26 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
                     }
                     if ((rand() as u8) & 255) < val {
                         enemy_ladder[i] = DIR_DOWN;
+                        ladder_taken = TRUE;
                     }
                 }
 
-                // Check up
-                let ladder_up: u8 = test_map(ox + 8, oy + 15);
-                if (ladder_up & T_LADDER) != 0 && oy > 40 {
-                    let mut val: u8;
-                    if player_y < oy {
-                        val = 64 + (game_loops << 4);
-                    } else {
-                        val = 64;
-                    }
-                    if ((rand() as u8) & 255) < val {
-                        enemy_ladder[i] = DIR_UP;
+                // Check up (only if down didn't take a ladder)
+                if ladder_taken == FALSE {
+                    let ladder_up: u8 = test_map(ox + 8, oy + 15);
+                    if (ladder_up & T_LADDER) != 0 {
+                        let mut val: u8;
+                        if player_y < oy {
+                            val = 64 + (game_loops << 4);
+                        } else {
+                            val = 64;
+                        }
+                        // C tests rand && oy>40 together (enemy.h:547) — keep
+                        // both inside the same conditional so RNG consumption
+                        // matches even when oy <= 40.
+                        if ((rand() as u8) & 255) < val && oy > 40 {
+                            enemy_ladder[i] = DIR_UP;
+                        }
                     }
                 }
             }
