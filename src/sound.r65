@@ -313,37 +313,47 @@ far fn sfx_play(chn: u8, sfx: u8, pan: u8) {
 // ============================================================================
 
 far fn music_play(mus: u8) {
-    // Halt the previous music BEFORE the IPL reload (matches C original at
-    // game.c:926-933). The per-branch call to spc_load_music passes the far
-    // pointer directly as an argument — going through a local `far *u8`
-    // variable here triggered a compiler codegen bug that clobbered the
-    // high byte of the address with a stack-frame value, so the SPC would
-    // upload ~535 bytes of garbage instead of the music track.
-    music_stop();
+    let mut music_data: far *u8;
+    let mut music_size: u16;
 
+    // Select music data based on track ID
     if mus == MUS_TITLE {
-        spc_load_music(&music_title_data as far *u8, MUSIC_TITLE_SIZE);
+        music_data = &music_title_data as far *u8;
+        music_size = MUSIC_TITLE_SIZE;
     } else if mus == MUS_GAME_START {
-        spc_load_music(&music_game_start_data as far *u8, MUSIC_GAME_START_SIZE);
+        music_data = &music_game_start_data as far *u8;
+        music_size = MUSIC_GAME_START_SIZE;
     } else if mus == MUS_STAGE_START {
-        spc_load_music(&music_stage_start_data as far *u8, MUSIC_STAGE_START_SIZE);
+        music_data = &music_stage_start_data as far *u8;
+        music_size = MUSIC_STAGE_START_SIZE;
     } else if mus == MUS_LOSE {
-        spc_load_music(&music_lose_data as far *u8, MUSIC_LOSE_SIZE);
+        music_data = &music_lose_data as far *u8;
+        music_size = MUSIC_LOSE_SIZE;
     } else if mus == MUS_STAGE_CLEAR {
-        spc_load_music(&music_stage_clear_data as far *u8, MUSIC_STAGE_CLEAR_SIZE);
+        music_data = &music_stage_clear_data as far *u8;
+        music_size = MUSIC_STAGE_CLEAR_SIZE;
     } else if mus == MUS_HAMMER {
-        spc_load_music(&music_hammer_data as far *u8, MUSIC_HAMMER_SIZE);
+        music_data = &music_hammer_data as far *u8;
+        music_size = MUSIC_HAMMER_SIZE;
     } else if mus == MUS_LEVEL1 {
-        spc_load_music(&music_level1_data as far *u8, MUSIC_LEVEL1_SIZE);
+        music_data = &music_level1_data as far *u8;
+        music_size = MUSIC_LEVEL1_SIZE;
     } else if mus == MUS_TIME_OUT {
-        spc_load_music(&music_time_out_data as far *u8, MUSIC_TIME_OUT_SIZE);
+        music_data = &music_time_out_data as far *u8;
+        music_size = MUSIC_TIME_OUT_SIZE;
     } else {
         // MUS_VICTORY
-        spc_load_music(&music_victory_data as far *u8, MUSIC_VICTORY_SIZE);
+        music_data = &music_victory_data as far *u8;
+        music_size = MUSIC_VICTORY_SIZE;
     }
 
-    // Restore global_volume after the load — the load path uses
-    // snes_spc_volume which may have been faded to 0 by fade_screen.
+    // Match C original (game.c:926-933): halt the previous music BEFORE
+    // reloading, then explicitly restore global_volume after the load (the
+    // load path uses snes_spc_volume which may have been faded to 0 by
+    // fade_screen). Without the explicit volume restore, the new track
+    // plays inaudibly when called from the post-fade victory cutscene.
+    music_stop();
+    spc_load_music(music_data, music_size);
     spc_volume(global_volume);
     music_start();
 }
