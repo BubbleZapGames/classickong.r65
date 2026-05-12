@@ -510,6 +510,13 @@ far fn elevators_process() {
     let mut spr: u16 = OAM_ELEVATORS;
     let mut i: u8 = 0;
 
+    // Sample whether the player is standing on an elevator BEFORE the move.
+    // Used after the move to keep the player riding an elevator that moves
+    // down (otherwise player_y+16 reads the just-cleared tile for one frame
+    // and the player enters/exits fall state, making the sprite toggle).
+    let floor_before: u8 = (test_map(player_x + 8 - PLR_BBOX_HWDT, (player_y + 16) as u16)
+                          | test_map(player_x + 8 + PLR_BBOX_HWDT, (player_y + 16) as u16)) & T_ELEVATOR;
+
     // Elevator movement gated to once every 4 frames
     if (game_frame_cnt & 3) == 0 {
         loop {
@@ -571,6 +578,15 @@ far fn elevators_process() {
         oam_spr1(0, 240, 0, spr);
         spr = spr + 4;
         i++;
+    }
+
+    // If the player was on an elevator before the move but isn't after,
+    // the elevator moved down out from under them — bump the player down
+    // so they keep riding it instead of oscillating into the fall state.
+    let floor_after: u8 = (test_map(player_x + 8 - PLR_BBOX_HWDT, (player_y + 16) as u16)
+                         | test_map(player_x + 8 + PLR_BBOX_HWDT, (player_y + 16) as u16)) & T_ELEVATOR;
+    if floor_before != 0 && floor_after == 0 {
+        player_y++;
     }
 }
 
