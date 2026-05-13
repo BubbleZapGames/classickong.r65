@@ -7,25 +7,9 @@
 #[bank(auto)]
 
 // ============================================================================
-// APU REGISTERS (SNES Audio Processing Unit I/O Ports)
-// ============================================================================
-
-#[hw(0x2140)]
-static mut APU0: u8;
-
-#[hw(0x2141)]
-static mut APU1: u8;
-
-#[hw(0x2142)]
-static mut APU2: u8;
-
-#[hw(0x2143)]
-static mut APU3: u8;
-
-
-// ============================================================================
 // SOUND STATE VARIABLES
 // ============================================================================
+// APU I/O ports (APUIO0..APUIO3) are declared in lib/sneslib.r65.
 
 #[lowram]
 static mut snes_spc_sync: u8;
@@ -110,23 +94,23 @@ const MUS_VICTORY: u8 = 8;
 // ============================================================================
 
 far fn spc_command(command: u16, param: u16) {
-    // Write command with sync byte. APU0 holds the sync byte (polled by the
-    // SPC driver for a new-command edge); APU1 high-nibble selects command.
-    // Write APU3/APU2/APU1 first so the params are stable by the time the
-    // SPC sees APU0 change.
+    // Write command with sync byte. APUIO0 holds the sync byte (polled by the
+    // SPC driver for a new-command edge); APUIO1 high-nibble selects command.
+    // Write APUIO3/APUIO2/APUIO1 first so the params are stable by the time the
+    // SPC sees APUIO0 change.
     let cmd: u16 = command | (snes_spc_sync as u16);
-    APU3 = (param >> 8) as u8;
-    APU2 = (param & 0xFF) as u8;
-    APU1 = (cmd >> 8) as u8;
-    APU0 = (cmd & 0xFF) as u8;
+    APUIO3 = (param >> 8) as u8;
+    APUIO2 = (param & 0xFF) as u8;
+    APUIO1 = (cmd >> 8) as u8;
+    APUIO0 = (cmd & 0xFF) as u8;
 
     if command != SCMD_RELOAD {
-        // Wait for the SPC driver to echo APU0 back, then bump sync. C
+        // Wait for the SPC driver to echo APUIO0 back, then bump sync. C
         // original busy-waits forever; we add a bail-out so a missing/dead
         // driver doesn't lock the game (e.g., before the driver is loaded).
         let mut timeout: u16 = 0;
         loop {
-            if APU0 == snes_spc_sync {
+            if APUIO0 == snes_spc_sync {
                 break;
             }
             timeout++;
@@ -193,7 +177,7 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
     let mut timeout: u16 = 0;
     let mut apu_ready: u8 = FALSE;
     loop {
-        if APU0 == 0xAA && APU1 == 0xBB {
+        if APUIO0 == 0xAA && APUIO1 == 0xBB {
             apu_ready = TRUE;
             break;
         }
@@ -208,19 +192,19 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
     }
 
     // Set destination address
-    APU2 = (adr & 0xFF) as u8;
-    APU3 = (adr >> 8) as u8;
+    APUIO2 = (adr & 0xFF) as u8;
+    APUIO3 = (adr >> 8) as u8;
 
     // Not last block
-    APU1 = 1;
+    APUIO1 = 1;
 
     // Start transfer command
-    APU0 = 0xCC;
+    APUIO0 = 0xCC;
 
     // Wait for ready with timeout
     timeout = 0;
     loop {
-        if APU0 == 0xCC {
+        if APUIO0 == 0xCC {
             break;
         }
         timeout++;
@@ -237,15 +221,15 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
         }
 
         // Write data byte
-        APU1 = src[ptr];
+        APUIO1 = src[ptr];
 
         // Write counter
-        APU0 = cnt;
+        APUIO0 = cnt;
 
         // Wait for acknowledgment with timeout
         timeout = 0;
         loop {
-            if APU0 == cnt {
+            if APUIO0 == cnt {
                 break;
             }
             timeout++;
@@ -257,12 +241,12 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
     }
 
     // Set startup address (0x0200)
-    APU2 = 0x00;
-    APU3 = 0x02;
+    APUIO2 = 0x00;
+    APUIO3 = 0x02;
 
     // Run APU code
-    APU1 = 0;
-    APU0 = cnt + 2;
+    APUIO1 = 0;
+    APUIO0 = cnt + 2;
 
     snes_spc_sync = cnt;
 
