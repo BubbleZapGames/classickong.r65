@@ -215,11 +215,7 @@ far fn spc_load_data(adr: u16, src: far *u8, size: u16) {
     let mut ptr: u16 = 0;
     let remaining: u16 = size;
 
-    loop {
-        if ptr == remaining {
-            break;
-        }
-
+    while ptr != remaining {
         // Write data byte
         APUIO1 = src[ptr];
 

@@ -395,12 +395,9 @@ far fn player_process_ground(pad: u16) {
 
         // Clear the 8 walkmap rows under the player's foot
         let mut w_off: u16 = WMAP_OFF!(rx, ry);
-        let mut wj: u8 = 0;
-        loop {
-            if wj >= 8 { break; }
+        for wj in 0..8 {
             walkmap[w_off] = 0;
             w_off = w_off + 32;
-            wj++;
         }
 
         game_rivets++;
@@ -608,17 +605,9 @@ far fn player_process_fall() -> u8 {
 
 far fn player_push_out_of_floor() {
     let mut y: u8 = player_y + 15;
-    let mut left: u8;
-    let mut right: u8;
 
-    loop {
-        left = test_map(player_x + 8 - PLR_BBOX_HWDT, y);
-        right = test_map(player_x + 8 + PLR_BBOX_HWDT, y);
-
-        if ((left | right) & T_SOLID) == 0 {
-            break;
-        }
-
+    while ((test_map(player_x + 8 - PLR_BBOX_HWDT, y)
+          | test_map(player_x + 8 + PLR_BBOX_HWDT, y)) & T_SOLID) != 0 {
         player_y--;
         y--;
     }

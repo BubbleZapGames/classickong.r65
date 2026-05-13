@@ -1977,12 +1977,9 @@ fn snes_init() {
 // Usage: delay(60);  // Wait ~1 second (NTSC)
 far fn delay(frames: u16) {
     let mut count: u16 = frames;
-    loop {
+    while count > 0 {
         wait_nmi!();
         count--;
-        if count == 0 {
-            break;
-        }
     }
 }
 

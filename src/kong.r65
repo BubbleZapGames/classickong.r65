@@ -754,10 +754,7 @@ far fn kong_process_level2() -> u8 {
     }
 
     // Moving ladders: state machine per ladder (0=down, 1=delay, 2=up, 3=delay)
-    let mut li: u8 = 0;
-    loop {
-        if li >= 2 { break; }
-
+    for li in 0..2 {
         let dir: u8 = ladders_dir[li];
         if dir == 0 {
             // Moving down: 1 pixel every 8 frames, 16 pixels total
@@ -807,8 +804,6 @@ far fn kong_process_level2() -> u8 {
                 }
             }
         }
-
-        li++;
     }
 
     if (game_frame_cnt & 1) != 0 {
@@ -824,11 +819,8 @@ far fn kong_process_level2() -> u8 {
             conveyor_dir[0] = conveyor_dir[0] ^ 1;
 
             // Flip top conveyor visual (row 7, cols 3..28)
-            let mut ni: u16 = 0;
-            loop {
-                if ni >= 26 { break; }
+            for ni in 0..26 {
                 nametable1[POS!(3, 7) + ni] = nametable1[POS!(3, 7) + ni] ^ 0xC;
-                ni++;
             }
 
             if kong_x < 26 {
@@ -836,11 +828,8 @@ far fn kong_process_level2() -> u8 {
                 sfx_play(SFX_CHN+3, SFX_SWITCH, 128);
 
                 // Flip bottom conveyor visual (row 22, all 32 cols)
-                let mut nj: u16 = 0;
-                loop {
-                    if nj >= 32 { break; }
+                for nj in 0..32 {
                     nametable1[POS!(0, 22) + nj] = nametable1[POS!(0, 22) + nj] ^ 0xC;
-                    nj++;
                 }
             }
 
@@ -855,12 +844,9 @@ far fn kong_process_level2() -> u8 {
                     game_belts_update = TRUE;
                     sfx_play(SFX_CHN+3, SFX_SWITCH, 128);
 
-                    let mut nk: u16 = 0;
-                    loop {
-                        if nk >= 15 { break; }
+                    for nk in 0..15 {
                         nametable1[POS!(0, 13) + nk] = nametable1[POS!(0, 13) + nk] ^ 0xC;
                         nametable1[POS!(17, 13) + nk] = nametable1[POS!(17, 13) + nk] ^ 0xC;
-                        nk++;
                     }
                 }
             }
@@ -869,9 +855,7 @@ far fn kong_process_level2() -> u8 {
         }
 
         // Cycle conveyor_cnt[1] and conveyor_cnt[2] (drives pan spawn timing)
-        let mut ci: u8 = 1;
-        loop {
-            if ci >= 3 { break; }
+        for ci in 1..3 {
             if conveyor_dir[ci] != 0 {
                 conveyor_cnt[ci]++;
                 if conveyor_cnt[ci] > val { conveyor_cnt[ci] = 0; }
@@ -879,7 +863,6 @@ far fn kong_process_level2() -> u8 {
                 conveyor_cnt[ci]--;
                 if conveyor_cnt[ci] >= val { conveyor_cnt[ci] = val - 1; }
             }
-            ci++;
         }
     } else {
         if conveyor_cnt[1] == 0 {
