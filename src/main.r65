@@ -903,9 +903,12 @@ far fn game_loop() -> u8 {
 
             if splat_active == 0 {
 
-        // Process elevators
+        // Process elevators. Returns T_ELEVATOR if the player is on an
+        // elevator this frame, 0 otherwise — used below to detect contact
+        // with the gear sprites at the top/bottom of the shaft.
+        let mut elevator: u8 = 0;
         if game_level == 2 {
-            elevators_process();
+            elevator = elevators_process();
         }
 
         // Read pad for gameplay
@@ -957,7 +960,11 @@ far fn game_loop() -> u8 {
 
         // Process items
         items_draw();
-        items_check_collision();
+        let item_clear: u8 = items_check_collision(elevator);
+        if item_clear != 0 {
+            clear = item_clear;
+            break;
+        }
 
         // Process particles
         particle_process();

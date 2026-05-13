@@ -389,14 +389,32 @@ far fn items_draw() {
 // Returns TRUE if animation should pause
 // ============================================================================
 
-far fn items_check_collision() -> u8 {
-    let mut anim: u8 = FALSE;
+// Takes the current elevator-state flag (T_ELEVATOR if the player is
+// riding an elevator this frame, 0 otherwise). Returns LEVEL_LOSE_WINCH
+// if the player touches an elevator gear while riding, otherwise 0.
+// Matches C process_items (game_loop.h:346).
+far fn items_check_collision(elevator: u8) -> u8 {
+    let mut clear: u8 = 0;
     let mut i: u8 = 0;
 
     loop {
         let itype: u8 = item_type[i];
 
-        if itype != ITEM_NONE && itype != ITEM_ELEVATOR {
+        if itype == ITEM_ELEVATOR {
+            // Gear at the top/bottom of an elevator shaft kills the player
+            // if they're being carried into it. game_loop.h:357-369.
+            if elevator != 0 {
+                if item_y[i] + 8 > player_y {
+                    if item_y[i] < player_y + 16 {
+                        if item_x[i] + 16 > player_x {
+                            if item_x[i] < player_x + 16 {
+                                clear = LEVEL_LOSE_WINCH;
+                            }
+                        }
+                    }
+                }
+            }
+        } else if itype != ITEM_NONE {
 
         if itype == ITEM_HAMMER {
             // Check if player touches hammer
@@ -406,7 +424,6 @@ far fn items_check_collision() -> u8 {
                         if item_x[i] < player_x + 16 {
                             // Got hammer!
                             item_type[i] = ITEM_NONE;
-                            anim = TRUE;
 
                             player_hammer_time = 600;  // 10 seconds at 60fps
                             player_hammer_phase = 0;   // game_loop.h:384
@@ -442,7 +459,6 @@ far fn items_check_collision() -> u8 {
                             particle_add(particle, item_x[i], item_y[i]);
 
                             item_type[i] = ITEM_NONE;
-                            anim = TRUE;
 
                             sfx_play(SFX_CHN + 3, SFX_ITEM, player_x + 8);
                         }
@@ -451,7 +467,7 @@ far fn items_check_collision() -> u8 {
             }
         }
 
-        } // end if itype != NONE && != ELEVATOR
+        } // end else (non-NONE, non-ELEVATOR)
 
         i++;
         if i >= items_all {
@@ -459,7 +475,7 @@ far fn items_check_collision() -> u8 {
         }
     }
 
-    return anim;
+    return clear;
 }
 
 
@@ -506,7 +522,11 @@ far fn elevator_add(x: u8, y: u8, dy: i8) {
 // FUNCTION: Process Elevators
 // ============================================================================
 
-far fn elevators_process() {
+// Returns T_ELEVATOR (16) if the player is on an elevator tile after the
+// move, 0 otherwise. Used by items_check_collision to know when to kill
+// the player on contact with the gear sprites at the top/bottom of the
+// elevator shaft (matches C game_loop.h:431 process_elevators return).
+far fn elevators_process() -> u8 {
     let mut spr: u16 = OAM_ELEVATORS;
     let mut i: u8 = 0;
 
@@ -583,11 +603,13 @@ far fn elevators_process() {
     // If the player was on an elevator before the move but isn't after,
     // the elevator moved down out from under them — bump the player down
     // so they keep riding it instead of oscillating into the fall state.
-    let floor_after: u8 = (test_map(player_x + 8 - PLR_BBOX_HWDT, (player_y + 16) as u16)
-                         | test_map(player_x + 8 + PLR_BBOX_HWDT, (player_y + 16) as u16)) & T_ELEVATOR;
+    let mut floor_after: u8 = (test_map(player_x + 8 - PLR_BBOX_HWDT, (player_y + 16) as u16)
+                              | test_map(player_x + 8 + PLR_BBOX_HWDT, (player_y + 16) as u16)) & T_ELEVATOR;
     if floor_before != 0 && floor_after == 0 {
         player_y++;
+        floor_after = T_ELEVATOR;
     }
+    return floor_after;
 }
 
 
