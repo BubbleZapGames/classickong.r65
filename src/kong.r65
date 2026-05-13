@@ -1023,10 +1023,28 @@ far fn kong_process_level4() -> u8 {
         if game_fireballs < game_fireballs_max {
             game_fireballs++;
 
-            // Find suitable spawn point
-            let spawn_idx: u8 = mod8(rand() as u8, fireball_spawn_all);
-            let fx: u8 = fireball_spawn_x[spawn_idx];
-            let fy: u8 = fireball_spawn_y[spawn_idx];
+            // Find a spawn point that's both vertically far (>32 px) from
+            // the player AND on the opposite half of the screen — matches
+            // C game_levels.h:471-481. Without this filter fireballs can
+            // appear right next to / behind the player.
+            let mut spawn_idx: u8 = mod8(rand() as u8, fireball_spawn_all);
+            let mut fx: u8 = 0;
+            let mut fy: u8 = 0;
+            let py: i16 = player_y as i16;
+            loop {
+                fx = fireball_spawn_x[spawn_idx];
+                fy = fireball_spawn_y[spawn_idx];
+                let fyi: i16 = fy as i16;
+                let y_far: u8 = if fyi <= py - 32 || fyi >= py + 32 { 1 } else { 0 };
+                let x_opposite: u8 = if (fx >> 7) != (player_x >> 7) { 1 } else { 0 };
+                if y_far != 0 && x_opposite != 0 {
+                    break;
+                }
+                spawn_idx++;
+                if spawn_idx >= fireball_spawn_all {
+                    spawn_idx = 0;
+                }
+            }
 
             enemy_add(ENEMY_FIREBALL_2, fx, fy, 0);
             sfx_play(SFX_CHN+2, SFX_FIRE_SPAWN, fx+8);
