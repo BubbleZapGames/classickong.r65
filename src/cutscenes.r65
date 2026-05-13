@@ -356,20 +356,15 @@ far fn full_title_screen() -> u8 {
 // ============================================================================
 
 // Static arrays for cutscene animation (compiler doesn't support stack arrays with initializers)
-#[lowram]
-static mut stack_y: [i16; 4];
-#[lowram]
-static mut stack_ty: [i16; 4];
-#[lowram]
-static mut stack_dy: [i16; 4];
-#[lowram]
-static mut stack_frame: [u8; 4];
-#[lowram]
-static mut stack_jump: [u8; 4];
-#[lowram]
-static mut stack_delay: [u8; 4];
-
 far fn cutscene_level() {
+
+    let mut stack_y: [i16; 4];
+    let mut stack_ty: [i16; 4];
+    let mut stack_dy: [i16; 4];
+    let mut stack_frame: [u8; 4];
+    let mut stack_jump: [u8; 4];
+    let mut stack_delay: [u8; 4];
+
     set_bright(0);
     setup_hdma_gradient(0xFF);
     oam_clear();
