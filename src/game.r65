@@ -201,30 +201,8 @@ far fn rand() -> u16 {
 
 #[interrupt(nmi)]
 far fn nmi_handler() {
-    // Minimal NMI handler in pure inline asm for stability
-    asm!(
-        "LDA $4210",         // Acknowledge NMI
-        "STZ $2102",         // OAM address = 0
-        "STZ $2103",
-        "LDA #$00",
-        "STA $4370",         // DMA mode: 1 reg, write, increment
-        "LDA #$04",
-        "STA $4371",         // DMA target: $2104 (OAMDATA)
-        "LDA #<oam_buffer",
-        "STA $4372",         // Source address low
-        "LDA #>oam_buffer",
-        "STA $4373",         // Source address high
-        "LDA #:oam_buffer",
-        "STA $4374",         // Source bank
-        "LDA #$20",
-        "STA $4375",         // Size low ($0220 = 544)
-        "LDA #$02",
-        "STA $4376",         // Size high
-        "LDA #$80",
-        "STA $420B"          // Trigger DMA channel 7
-    );
-
-    // Increment frame counter
+    clear_nmi!();
+    dma_copy_oam_const!(7, oam_buffer, 544);
     frame_cnt++;
 }
 
