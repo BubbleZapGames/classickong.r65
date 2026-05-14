@@ -297,35 +297,45 @@ far fn music_play(mus: u8) {
     let mut music_size: u16;
 
     // Select music data based on track ID
-    if mus == MUS_TITLE {
-        music_data = &music_title_data as far *u8;
-        music_size = MUSIC_TITLE_SIZE;
-    } else if mus == MUS_GAME_START {
-        music_data = &music_game_start_data as far *u8;
-        music_size = MUSIC_GAME_START_SIZE;
-    } else if mus == MUS_STAGE_START {
-        music_data = &music_stage_start_data as far *u8;
-        music_size = MUSIC_STAGE_START_SIZE;
-    } else if mus == MUS_LOSE {
-        music_data = &music_lose_data as far *u8;
-        music_size = MUSIC_LOSE_SIZE;
-    } else if mus == MUS_STAGE_CLEAR {
-        music_data = &music_stage_clear_data as far *u8;
-        music_size = MUSIC_STAGE_CLEAR_SIZE;
-    } else if mus == MUS_HAMMER {
-        music_data = &music_hammer_data as far *u8;
-        music_size = MUSIC_HAMMER_SIZE;
-    } else if mus == MUS_LEVEL1 {
-        music_data = &music_level1_data as far *u8;
-        music_size = MUSIC_LEVEL1_SIZE;
-    } else if mus == MUS_TIME_OUT {
-        music_data = &music_time_out_data as far *u8;
-        music_size = MUSIC_TIME_OUT_SIZE;
-    } else {
-        // MUS_VICTORY
-        music_data = &music_victory_data as far *u8;
-        music_size = MUSIC_VICTORY_SIZE;
-    }
+    match mus {
+        MUS_TITLE => {
+            music_data = &music_title_data as far *u8;
+            music_size = MUSIC_TITLE_SIZE;
+        },
+        MUS_GAME_START => {
+            music_data = &music_game_start_data as far *u8;
+            music_size = MUSIC_GAME_START_SIZE;
+        },
+        MUS_STAGE_START => {
+            music_data = &music_stage_start_data as far *u8;
+            music_size = MUSIC_STAGE_START_SIZE;
+        },
+        MUS_LOSE => {
+            music_data = &music_lose_data as far *u8;
+            music_size = MUSIC_LOSE_SIZE;
+        },
+        MUS_STAGE_CLEAR => {
+            music_data = &music_stage_clear_data as far *u8;
+            music_size = MUSIC_STAGE_CLEAR_SIZE;
+        },
+        MUS_HAMMER => {
+            music_data = &music_hammer_data as far *u8;
+            music_size = MUSIC_HAMMER_SIZE;
+        },
+        MUS_LEVEL1 => {
+            music_data = &music_level1_data as far *u8;
+            music_size = MUSIC_LEVEL1_SIZE;
+        },
+        MUS_TIME_OUT => {
+            music_data = &music_time_out_data as far *u8;
+            music_size = MUSIC_TIME_OUT_SIZE;
+        },
+        _ => {
+            // MUS_VICTORY
+            music_data = &music_victory_data as far *u8;
+            music_size = MUSIC_VICTORY_SIZE;
+        },
+    };
 
     // Match C original (game.c:926-933): halt the previous music BEFORE
     // reloading, then explicitly restore global_volume after the load (the
