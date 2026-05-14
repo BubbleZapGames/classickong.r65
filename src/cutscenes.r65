@@ -118,33 +118,26 @@ far fn setup_hdma_gradient(n: u8) {
     DMAP2 = 0x00;
     BBAD2 = 0x32;
 
-    // Select gradient tables based on n
-    // Note: macro args use WLA-DX label names (compiler appends _data suffix)
-    if n == 0 {
-        // No gradient (null tables)
-        hdma_set_tables!(hdma_null_data, hdma_null_data, hdma_null_data);
-    } else if n == 1 {
+    // Select gradient tables based on n.
+    // Macro args use WLA-DX label names (compiler appends _data suffix).
+    match n {
+        // No gradient
+        0 => { hdma_set_tables!(hdma_null_data,            hdma_null_data,            hdma_null_data); },
         // Level 1
-        hdma_set_tables!(hdma_gradient0_list0_data, hdma_gradient0_list1_data, hdma_gradient0_list2_data);
-    } else if n == 2 {
+        1 => { hdma_set_tables!(hdma_gradient0_list0_data, hdma_gradient0_list1_data, hdma_gradient0_list2_data); },
         // Level 2
-        hdma_set_tables!(hdma_gradient5_list0_data, hdma_gradient5_list1_data, hdma_gradient5_list2_data);
-    } else if n == 3 {
+        2 => { hdma_set_tables!(hdma_gradient5_list0_data, hdma_gradient5_list1_data, hdma_gradient5_list2_data); },
         // Level 3
-        hdma_set_tables!(hdma_gradient2_list0_data, hdma_gradient2_list1_data, hdma_gradient2_list2_data);
-    } else if n == 4 {
+        3 => { hdma_set_tables!(hdma_gradient2_list0_data, hdma_gradient2_list1_data, hdma_gradient2_list2_data); },
         // Level 4
-        hdma_set_tables!(hdma_gradient1_list0_data, hdma_gradient1_list1_data, hdma_gradient1_list2_data);
-    } else if n == 5 {
+        4 => { hdma_set_tables!(hdma_gradient1_list0_data, hdma_gradient1_list1_data, hdma_gradient1_list2_data); },
         // Title screen
-        hdma_set_tables!(hdma_gradient3_list0_data, hdma_gradient3_list1_data, hdma_gradient3_list2_data);
-    } else if n == 6 {
+        5 => { hdma_set_tables!(hdma_gradient3_list0_data, hdma_gradient3_list1_data, hdma_gradient3_list2_data); },
         // Sound test / levels clear
-        hdma_set_tables!(hdma_gradient4_list0_data, hdma_gradient4_list1_data, hdma_gradient4_list2_data);
-    } else {
+        6 => { hdma_set_tables!(hdma_gradient4_list0_data, hdma_gradient4_list1_data, hdma_gradient4_list2_data); },
         // How high can you get (n >= 7)
-        hdma_set_tables!(hdma_gradient6_list0_data, hdma_gradient6_list1_data, hdma_gradient6_list2_data);
-    }
+        _ => { hdma_set_tables!(hdma_gradient6_list0_data, hdma_gradient6_list1_data, hdma_gradient6_list2_data); },
+    };
 
     HDMAEN = 0x07;  // Enable HDMA channels 0, 1, 2
 }
