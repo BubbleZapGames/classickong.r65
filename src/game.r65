@@ -309,23 +309,8 @@ far fn set_color(index: u16, color: u16) {
 const PALETTE_BUFFER_ADDR: u16 = 0x2000;
 
 far fn update_palette() {
-    // DMA palette_buffer (RAM) to CGRAM through channel 7. Mirrors C
-    // update_palette (sneslib.h):
-    //   DMA_TYPE(7,0x2200); DMA_ADDR(7,snes_palette);
-    //   DMA_SIZE(7,0x200); MDMAEN(1<<7);
-    CGADD = 0;          // Start at color 0
-    DMAP7 = 0x02;       // 1 reg, write twice (CGDATA is double-write)
-    BBAD7 = 0x22;       // PPU target $2122 = CGDATA
-
-    let src: far *u8 = &palette_buffer as far *u8;
-    A1T7L = src as u8;
-    A1T7H = ((src as u16) >> 8) as u8;
-    A1B7  = src.bank_byte();
-
-    DAS7L = 0x00;       // 512 bytes
-    DAS7H = 0x02;
-
-    MDMAEN = 0x80;      // Trigger channel 7
+    // DMA palette_buffer (RAM) to CGRAM through channel 7
+    dma_copy_cgram_const!(7, palette_buffer, 0, 256);
 }
 
 
