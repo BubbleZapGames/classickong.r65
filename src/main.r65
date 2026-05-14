@@ -408,13 +408,13 @@ far fn show_pal_warning() {
 far fn unpack_level() {
     // Unpack RLE level data into map array
     if game_level == 0 {
-        unrle(&map1_data as *u8 as u16, DATA_BANK_1);
+        unrle(&map1_data as far *u8);
     } else if game_level == 1 {
-        unrle(&map2_data as *u8 as u16, DATA_BANK_1);
+        unrle(&map2_data as far *u8);
     } else if game_level == 2 {
-        unrle(&map3_data as *u8 as u16, DATA_BANK_1);
+        unrle(&map3_data as far *u8);
     } else {
-        unrle(&map4_data as *u8 as u16, DATA_BANK_1);
+        unrle(&map4_data as far *u8);
     }
 
     // Break some ladders on the first level in later loops

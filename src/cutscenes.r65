@@ -622,7 +622,7 @@ far fn cutscene_intro() {
     set_background(0xFF);
 
     // Load intro map
-    unrle(&mapi_data as *u8 as u16, DATA_BANK_1);
+    unrle(&mapi_data as far *u8);
 
     // Copy map to nametable
     let mut ptr: u16 = 0;
@@ -891,7 +891,7 @@ far fn cutscene_levels_clear() {
     clear_nametables();
 
     // Load ending map
-    unrle(&mape_data as *u8 as u16, DATA_BANK_1);
+    unrle(&mape_data as far *u8);
 
     // Copy map to nametable
     let mut ptr: u16 = 0;
@@ -1319,7 +1319,7 @@ far fn sound_test() {
     clear_nametables();
 
     // Unpack background map (same as cutscene_levels_clear)
-    unrle(&mape_data as *u8 as u16, DATA_BANK_1);
+    unrle(&mape_data as far *u8);
 
     let mut i: u16 = 0;
     loop {

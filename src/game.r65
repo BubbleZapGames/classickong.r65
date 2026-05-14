@@ -980,67 +980,40 @@ far fn update_nametables() {
 // FUNCTION: RLE Decompression
 // ============================================================================
 
-far fn unrle(src_addr: u16, src_bank: u8) {
-    // RLE decompression from ROM to map[] buffer.
-    // Caller passes address + bank separately to avoid far pointer D=S issues.
-    // We set up a zeropage indirect long pointer manually.
-
-    // Set up source pointer at zeropage $10-$12
-    asm!(
-        "LDA {ADDR}", "STA $10",
-        "LDA {ADDR}+1", "STA $11",
-        "LDA {BANK}", "STA $12",
-        ADDR="SCRATCH0", BANK="SCRATCH2"
-    );
-
-    // Read tag byte via indirect long
-    let mut tag: u8;
-    Y = 0;
-    asm!("LDA [$10],Y");
-    tag = A;
-
-    // Increment source pointer
-    asm!("INC $10", "BNE +", "INC $11", "+");
-
-    let mut last_byte: u8 = 0;
+// Tag-byte RLE decompression from ROM to map[]. Mirrors game.c:928:
+//   tag = *src++; while (1) { i = *src++; if (i == tag) { i = *src++;
+//   if (!i) break; while (i) { *dst++ = byte; --i; } } else
+//   { byte = i; *dst++ = byte; } }
+// A byte equal to tag introduces a run of the last literal; a literal
+// is written through and remembered. End marker is `tag, 0x00`.
+far fn unrle(src: far *u8) {
+    let tag: u8 = src[0];
+    let mut i: u16 = 1;
+    let mut byte: u8 = 0;
     let mut dst_off: u16 = 0;
 
     loop {
-        // Read next byte from source via indirect long
-        let mut byte: u8;
-        Y = 0;
-        asm!("LDA [$10],Y");
-        byte = A;
+        let cur: u8 = src[i];
+        i++;
 
-        // Increment source pointer
-        asm!("INC $10", "BNE +", "INC $11", "+");
-
-        if byte == tag {
-            // Run length: read count
-            let mut count: u8;
-            Y = 0;
-            asm!("LDA [$10],Y");
-            count = A;
-
-            // Increment source pointer
-            asm!("INC $10", "BNE +", "INC $11", "+");
-
+        if cur == tag {
+            let count: u8 = src[i];
+            i++;
             if count == 0 {
-                break;  // End marker
+                break;
             }
-
+            let mut c: u8 = count;
             loop {
-                map[dst_off] = last_byte;
+                map[dst_off] = byte;
                 dst_off++;
-                count--;
-                if count == 0 {
+                c--;
+                if c == 0 {
                     break;
                 }
             }
         } else {
-            // Literal byte
-            last_byte = byte;
-            map[dst_off] = byte;
+            byte = cur;
+            map[dst_off] = cur;
             dst_off++;
         }
     }
