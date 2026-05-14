@@ -161,26 +161,15 @@ far fn title_screen_press_start_str(show: u8) {
 // ============================================================================
 
 far fn title_set_rect(off: u16, wdt: u8, hgt: u8, tile: u16, swdt: u8) {
-    let mut row: u8 = 0;
     let mut current_tile: u16 = tile;
     let mut pos: u16 = off;
 
-    loop {
-        let mut col: u8 = 0;
-        loop {
+    for row in 0..hgt {
+        for col in 0..wdt {
             nametable1[pos + (col as u16)] = current_tile + (col as u16);
-            col++;
-            if col >= wdt {
-                break;
-            }
         }
-
         pos = pos + 32;
         current_tile = current_tile + (swdt as u16);
-        row++;
-        if row >= hgt {
-            break;
-        }
     }
 }
 
