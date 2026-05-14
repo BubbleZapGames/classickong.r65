@@ -359,13 +359,8 @@ far fn cutscene_level() {
     set_background(0xFF);  // Clear BG2 VRAM area
 
     // Fill background with pattern
-    let mut ptr: u16 = 0;
-    loop {
+    for ptr in 0..1024 {
         nametable2[ptr] = 0x158 | BG_PAL!(1);
-        ptr++;
-        if ptr >= 1024 {
-            break;
-        }
     }
 
     // Show height markers based on level
@@ -389,13 +384,8 @@ far fn cutscene_level() {
     update_palette();
 
     // Set all sprites to 16x16
-    let mut i: u16 = 0;
-    loop {
+    for i in 0..128 {
         oam_size(i << 2, 1);
-        i++;
-        if i >= 128 {
-            break;
-        }
     }
 
     let mut bright: u8 = 0;
@@ -599,13 +589,8 @@ far fn cutscene_intro() {
     unrle(&mapi_data as far *u8);
 
     // Copy map to nametable
-    let mut ptr: u16 = 0;
-    loop {
+    for ptr in 0..1024 {
         nametable1[ptr] = (map[ptr] as u16) + 0x0140 | BG_PAL!(1);
-        ptr++;
-        if ptr >= 1024 {
-            break;
-        }
     }
 
     update_nametables();
@@ -613,31 +598,20 @@ far fn cutscene_intro() {
     update_palette();
 
     // Set all sprites to 16x16
-    let mut i: u16 = 0;
-    loop {
+    for i in 0..128 {
         oam_size(i << 2, 1);
-        i++;
-        if i >= 128 {
-            break;
-        }
     }
 
     // Clear platform animation counters
-    i = 0;
-    loop {
+    for i in 0..192 {
         platform_anim_cnt[i] = 0;
-        i++;
-        if i >= 192 {
-            break;
-        }
     }
 
     music_play(MUS_GAME_START);
 
     // Initialize falling ladder fragments
     let mut y: u8 = 216;  // 224 - 8
-    i = 0;
-    loop {
+    for i in 0..(LADDERS_MAX as u16) {
         if (i & 1) == 0 {
             ladders_x[i] = 118;
         } else {
@@ -648,10 +622,6 @@ far fn cutscene_intro() {
 
         if (i & 1) != 0 {
             y = y - 16;
-        }
-        i++;
-        if i >= (LADDERS_MAX as u16) {
-            break;
         }
     }
 
@@ -805,12 +775,7 @@ far fn cutscene_intro() {
     }
 
     // ---- Kong laugh ----
-    i = 0;
-    loop {
-        if i >= 80 {
-            break;
-        }
-
+    for i in 0..(80 as u16) {
         nmi_wait();
 
         if (i & 15) == 0 {
@@ -832,7 +797,6 @@ far fn cutscene_intro() {
         game_show_princess(princess_frame);
 
         game_frame_cnt++;
-        i++;
     }
 
     delay(25);

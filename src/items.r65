@@ -139,14 +139,9 @@ far fn particle_clear(id: u8) {
 // ============================================================================
 
 far fn particles_clear() {
-    let mut i: u8 = 0;
-    loop {
+    for i in 0..PARTICLES_MAX {
         particle_type[i] = PART_TYPE_NONE;
         particle_clear(i);
-        i++;
-        if i >= PARTICLES_MAX {
-            break;
-        }
     }
 }
 
@@ -328,14 +323,9 @@ far fn particle_process() {
 // ============================================================================
 
 far fn items_clear() {
-    let mut i: u8 = 0;
-    loop {
+    for i in 0..ITEMS_MAX {
         item_type[i] = ITEM_NONE;
         oam_spr1(0, 240, 0, OAM_ITEMS + ((i as u16) << 2));
-        i++;
-        if i >= ITEMS_MAX {
-            break;
-        }
     }
     items_all = 0;
 }
@@ -364,9 +354,7 @@ far fn game_item_add(x: u8, y: u8, itype: u8) {
 
 far fn items_draw() {
     let mut spr: u16 = OAM_ITEMS;
-    let mut i: u8 = 0;
-
-    loop {
+    for i in 0..ITEMS_MAX {
         let itype: u8 = item_type[i];
 
         if itype != ITEM_NONE && itype != ITEM_ELEVATOR {
@@ -376,10 +364,6 @@ far fn items_draw() {
         }
 
         spr = spr + 4;
-        i++;
-        if i >= ITEMS_MAX {
-            break;
-        }
     }
 }
 
@@ -484,16 +468,11 @@ far fn items_check_collision(elevator: u8) -> u8 {
 // ============================================================================
 
 far fn elevators_clear() {
-    let mut i: u8 = 0;
-    loop {
+    for i in 0..ELEVATORS_MAX {
         elevator_x[i] = 0;
         elevator_y[i] = 0;
         elevator_dy[i] = 0;
         oam_spr1(0, 240, 0, OAM_ELEVATORS + ((i as u16) << 2));
-        i++;
-        if i >= ELEVATORS_MAX {
-            break;
-        }
     }
     elevators_all = 0;
     elevator_top = 0;

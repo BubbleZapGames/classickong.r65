@@ -269,27 +269,17 @@ static bounce_speed: [i16; 10] = [
 
 far fn enemy_clear() {
     // Clear all enemy types
-    let mut i: u16 = 0;
-    loop {
+    for i in 0..(ENEMY_MAX as u16) {
         enemy_type[i] = ENEMY_NONE;
-        i++;
-        if i >= ENEMY_MAX as u16 {
-            break;
-        }
     }
 
     enemy_free = 0;
     enemy_all = 0;
 
     // Hide all enemy sprites (oam_spr clears the OAM extended X high bit too)
-    i = 0;
-    loop {
-        let mut spr: u16 = OAM_ENEMY + (i << 2);
+    for i in 0..(ENEMY_MAX as u16) {
+        let spr: u16 = OAM_ENEMY + (i << 2);
         oam_spr(0, 240, 0, spr);
-        i++;
-        if i >= ENEMY_MAX as u16 {
-            break;
-        }
     }
 }
 
@@ -1033,11 +1023,10 @@ far fn enemy_check_hammer_collision(i: u8, ox: u8, oy: u8) -> u8 {
 far fn enemy_process() -> u8 {
     let mut clear: u8 = 0;
     let mut spr: u16 = OAM_ENEMY;
-    let mut i: u8 = 0;
     game_barrels_jumped = 0;
     game_jump_over = FALSE;
 
-    loop {
+    for i in 0..ENEMY_MAX {
         let mut etype: u8 = enemy_type[i];
 
         if etype == ENEMY_NONE {
@@ -1193,10 +1182,6 @@ far fn enemy_process() -> u8 {
         } // end else (etype != ENEMY_NONE)
 
         spr = spr + 4;
-        i++;
-        if i >= ENEMY_MAX {
-            break;
-        }
     }
 
     // Fire spawning now handled directly in process_rolling_barrel

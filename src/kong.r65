@@ -407,10 +407,8 @@ far fn game_show_kong(oam_off: u16, kx: u8, ky: i16) {
     }
 
     // Draw 4 sprites for Kong
-    let mut i: u8 = 0;
     let mut off: u16 = oam_off;
-
-    loop {
+    for i in 0..4 {
         let idx: u16 = mul8(i, 3);
         let sx: i16 = (kx as i16) + (frame[idx] as i16);
         let sy: i16 = ky + (frame[idx + 1] as i16);
@@ -434,10 +432,6 @@ far fn game_show_kong(oam_off: u16, kx: u8, ky: i16) {
         }
 
         off = off + 4;
-        i++;
-        if i >= 4 {
-            break;
-        }
     }
 
     // 5th sprite slot for barrel being held

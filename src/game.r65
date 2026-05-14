@@ -476,50 +476,28 @@ far fn set_background(n: u8) {
 
     if game_flip == 0 {
         // Normal (non-flipped) mask generation
-        loop {
-            if off >= limit {
-                break;
-            }
-
-            let mut row: u8 = 0;
-            loop {
+        while off < limit {
+            for row in 0..8 {
                 let mut tile: u16 = back_buffer[off + (row as u16)] | back_buffer[off + 8 + (row as u16)];
                 tile = tile | (tile >> 8) | (tile << 8);
                 back_graphics[ptr] = ~tile;
                 ptr++;
-                row++;
-                if row >= 8 {
-                    break;
-                }
             }
-
             off = off + 16;
         }
     } else {
         // Flipped mask generation (uses flip_table for bit reversal)
-        // This path uses inline asm for the flip lookup since we need
-        // byte-level table lookup that R65 can express with array indexing
-        loop {
-            if off >= limit {
-                break;
-            }
-
-            let mut row: u8 = 0;
-            loop {
+        while off < limit {
+            for row in 0..8 {
                 let mut tile: u16 = back_buffer[off + (row as u16)] | back_buffer[off + 8 + (row as u16)];
                 // Flip both bytes using flip_table lookup
-                let mut lo: u8 = flip_table[(tile & 0xFF) as u8];
-                let mut hi: u8 = flip_table[(tile >> 8) as u8];
+                let lo: u8 = flip_table[(tile & 0xFF) as u8];
+                let hi: u8 = flip_table[(tile >> 8) as u8];
                 tile = (lo as u16) | ((hi as u16) << 8);
                 tile = tile | (tile >> 8) | (tile << 8);
                 back_graphics[ptr] = ~tile;
                 ptr++;
-                row++;
-                if row >= 8 {
-                    break;
-                }
             }
-
             off = off + 16;
         }
     }
@@ -729,30 +707,18 @@ far fn oam_size(off: u16, size: u8) {
 // ============================================================================
 
 far fn oam_clear() {
-    let mut i: u16 = 0;
-
-    loop {
-        oam_buffer[i] = 0;      // X pos
-        i++;
-        oam_buffer[i] = 240;    // Y (off-screen)
-        i++;
-        oam_buffer[i] = 0;      // Tile
-        i++;
-        oam_buffer[i] = 0;      // Attr
-        i++;
-
-        if i >= 512 {
-            break;
-        }
+    // Sprite table: 128 entries × 4 bytes (X, Y, tile, attr).
+    for n in 0..128 {
+        let base: u16 = n << 2;
+        oam_buffer[base    ] = 0;     // X pos
+        oam_buffer[base + 1] = 240;   // Y (off-screen)
+        oam_buffer[base + 2] = 0;     // Tile
+        oam_buffer[base + 3] = 0;     // Attr
     }
 
-    // Clear extended OAM (X high bits and size bits)
-    loop {
+    // Clear extended OAM (X high bits and size bits): 32 more bytes at 512.
+    for i in 512..544 {
         oam_buffer[i] = 0;
-        i++;
-        if i >= 544 {
-            break;
-        }
     }
 }
 
@@ -855,13 +821,8 @@ far fn game_init() {
     CGADSUB = 0x82;
 
     // Reset scroll
-    let mut layer: u8 = 0;
-    loop {
+    for layer in 0..4 {
         set_scroll_layer(layer, 0, 0);
-        layer++;
-        if layer >= 4 {
-            break;
-        }
     }
 
     // Clear display
@@ -1234,16 +1195,13 @@ far fn put_score(pos: u16, score: far *U32) {
     score_ten.from_u16(10);
 
     let mut d: u8 = 5;
-    loop {
-        if d == 0 {
-            break;
-        }
+    while d != 0 {
         d--;
 
         // digit = score_tmp % 10
         score_tmp2.copy(&score_tmp);
         score_tmp2.mod(&score_ten);
-        let mut digit: u8 = score_tmp2.lo as u8;
+        let digit: u8 = score_tmp2.lo as u8;
 
         nametable1[pos + (d as u16)] = (0x10 + (digit as u16)) | TEXT_ATR;
 
@@ -1362,13 +1320,8 @@ far fn game_update_bonus() {
         }
         put_num(POS!(x, 1), display_val, 4);
     } else {
-        let mut i: u8 = 0;
-        loop {
-            if i >= 4 {
-                break;
-            }
+        for i in 0..4 {
             nametable1[POS!(x + (i as u16), 1)] = 0x0140;
-            i++;
         }
     }
 }
