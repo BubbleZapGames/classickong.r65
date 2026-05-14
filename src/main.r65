@@ -187,39 +187,28 @@ const OAM_PLATFORMS: u16 = 64 << 2;   // 28 sprites (4 platforms × 7) — level
 far fn setup_palettes() {
     // All game palettes are in bank 1
     // Font palette (colors 0-15)
-    set_pal_src(&font_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(0, 16);
+    set_palette(0, 16, &font_pal as far *u16);
 
     // Tileset2 palette (colors 32-47)
     // Note: tileset1 palette (16-31) is set by set_background() with level-specific variant
     if game_level != 1 {
-        set_pal_src(&tileset2_pal as *u8 as u16, DATA_BANK_1);
+        set_palette(32, 16, &tileset2_pal as far *u16);
     } else {
-        set_pal_src(&tileset2alt_pal as *u8 as u16, DATA_BANK_1);
+        set_palette(32, 16, &tileset2alt_pal as far *u16);
     }
-    set_palette(32, 16);
 
     // Title screen palettes
-    set_pal_src(&title_top_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(80, 16);
-    set_pal_src(&title_bottom_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(96, 16);
+    set_palette(80, 16, &title_top_pal as far *u16);
+    set_palette(96, 16, &title_bottom_pal as far *u16);
 
     // Sprite palettes (start at 128 for OBJ)
-    set_pal_src(&sprites1_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(128, 16);  // Player
-    set_pal_src(&sprites2_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(144, 16);  // Items
-    set_pal_src(&sprites3_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(160, 16);  // Kong
-    set_pal_src(&sprites4_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(176, 16);  // Barrels
-    set_pal_src(&sprites5_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(192, 16);  // Enemies
-    set_pal_src(&sprites6_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(208, 16);  // Princess
-    set_pal_src(&sprites2_pal as *u8 as u16, DATA_BANK_1);
-    set_palette(240, 16);  // Game over text
+    set_palette(128, 16, &sprites1_pal as far *u16);  // Player
+    set_palette(144, 16, &sprites2_pal as far *u16);  // Items
+    set_palette(160, 16, &sprites3_pal as far *u16);  // Kong
+    set_palette(176, 16, &sprites4_pal as far *u16);  // Barrels
+    set_palette(192, 16, &sprites5_pal as far *u16);  // Enemies
+    set_palette(208, 16, &sprites6_pal as far *u16);  // Princess
+    set_palette(240, 16, &sprites2_pal as far *u16);  // Game over text
 }
 
 
@@ -264,8 +253,7 @@ far fn show_logo() {
 	dma_copy_vram_const!(0, bzlogo_gfx_data, 2048, 7168);
 
     // Copy logo palette (256 colors) - in bank 4
-    set_pal_src(0xC060, DATA_BANK_4);  // bzlogo_pal at 04:C060
-    set_palette(0, 256);
+    set_palette(0, 256, &bzlogo_pal as far *u16);
 
     // Clear nametables with tile 0 (8bpp mode needs 0, not $100)
     clear_nametables_zero();

@@ -277,44 +277,18 @@ far fn pad_poll_trigger(joy: u16) -> u16 {
 // NOTE: Uses zeropage variables for source address to avoid far pointer
 // parameter passing bug in the compiler.
 
-// Palette source pointer - must be consecutive for [dp],Y addressing
-// Using explicit addresses to guarantee layout: addr(2) + bank(1) = 3 bytes
-#[zeropage(0x10)]
-static mut pal_src_addr: u16;
-
-#[zeropage(0x12)]
-static mut pal_src_bank: u8;
-
-// Helper function to set palette source address
-far fn set_pal_src(addr: u16, bank: u8) {
-    pal_src_addr = addr;
-    pal_src_bank = bank;
-}
-
-far fn set_palette(start @ X: u16, count @ Y: u16) {
-    // Copy palette data - pure assembly for reliability
-    // X = start color index, Y = color count
-    // pal_src_addr/pal_src_bank at $10-$12 = source far pointer
-    asm!(
-        "STX $14",              // $14-15 = dest index
-        "STY $16",              // $16-17 = count
-        "LDY #$0000",           // Y = source byte offset
-        "REP #$20",             // Switch to 16-bit A for color loading
-        "__pal_loop:",
-        "LDA [$10],Y",          // Load 16-bit color from source
-        "PHA",                  // Save color (16-bit)
-        "LDA $14",              // Load dest index (still works in 16-bit)
-        "ASL A",                // *2 for byte offset
-        "TAX",
-        "PLA",                  // Restore color (16-bit)
-        "STA $7E2000,X",        // Store 16-bit to palette_buffer
-        "INC $14",              // dest++
-        "INY",
-        "INY",                  // Y += 2
-        "DEC $16",              // count--
-        "BNE __pal_loop",
-        "SEP #$20"              // Restore 8-bit A mode
-    );
+// Copy `count` 16-bit colors from `src` into palette_buffer starting at
+// color index `start`. Mirrors C set_palette (sneslib.h:224):
+//   memcpy(&snes_palette[i], src, len * sizeof(unsigned int));
+far fn set_palette(start: u16, count: u16, src: far *u16) {
+    let mut i: u16 = 0;
+    loop {
+        if i >= count {
+            break;
+        }
+        palette_buffer[start + i] = src[i];
+        i++;
+    }
 }
 
 
@@ -489,13 +463,12 @@ far fn copy_mem(size @ Y: u16) {
 far fn set_background(n: u8) {
     // Select palette based on level
     if n == 2 {
-        set_pal_src(&tileset1alt1_pal as u16, DATA_BANK_1);
+        set_palette(16, 16, &tileset1alt1_pal as far *u16);
     } else if n == 3 {
-        set_pal_src(&tileset1alt2_pal as u16, DATA_BANK_1);
+        set_palette(16, 16, &tileset1alt2_pal as far *u16);
     } else {
-        set_pal_src(&tileset1_pal as u16, DATA_BANK_1);
+        set_palette(16, 16, &tileset1_pal as far *u16);
     }
-    set_palette(16, 16);
 
     // If n == 0xFF (was -1 in C), just clear VRAM and return
     if n == 0xFF {
@@ -640,8 +613,7 @@ far fn set_background(n: u8) {
     copy_to_vram(0x4000, 24576);
 
     // Set background palette (palette 7, colors 112-127)
-    set_pal_src(&back1_pal as u16, DATA_BANK_1);
-    set_palette(112, 16);
+    set_palette(112, 16, &back1_pal as far *u16);
 
     // Fill nametable2 with sequential tile indices + BG_PAL(7)
     off = 0;
