@@ -309,30 +309,23 @@ far fn set_color(index: u16, color: u16) {
 const PALETTE_BUFFER_ADDR: u16 = 0x2000;
 
 far fn update_palette() {
-    // DMA palette buffer to CGRAM (channel 7)
-    CGADD = 0;  // Start at color 0
+    // DMA palette_buffer (RAM) to CGRAM through channel 7. Mirrors C
+    // update_palette (sneslib.h):
+    //   DMA_TYPE(7,0x2200); DMA_ADDR(7,snes_palette);
+    //   DMA_SIZE(7,0x200); MDMAEN(1<<7);
+    CGADD = 0;          // Start at color 0
+    DMAP7 = 0x02;       // 1 reg, write twice (CGDATA is double-write)
+    BBAD7 = 0x22;       // PPU target $2122 = CGDATA
 
-    DMAP7 = 0x02;  // 1 register, write twice (low/high)
-    BBAD7 = 0x22;  // $2122 = CGDATA
+    let src: far *u8 = &palette_buffer as far *u8;
+    A1T7L = src as u8;
+    A1T7H = ((src as u16) >> 8) as u8;
+    A1B7  = src.bank_byte();
 
-    // Use hardcoded address to avoid compiler address-of bug
-    // palette_buffer is at $7E2000
-    // Switch to 8-bit A for register writes
-    asm!(
-        "SEP #$20",        // 8-bit A
-        "LDA #$00",
-        "STA $4372",       // A1T7L = $00
-        "LDA #$20",
-        "STA $4373",       // A1T7H = $20
-        "LDA #$7E",
-        "STA $4374",       // A1B7 = $7E
-        "REP #$20"         // Back to 16-bit A
-    );
-
-    DAS7L = 0x00;  // 512 bytes ($0200)
+    DAS7L = 0x00;       // 512 bytes
     DAS7H = 0x02;
 
-    MDMAEN = 0x80;
+    MDMAEN = 0x80;      // Trigger channel 7
 }
 
 
