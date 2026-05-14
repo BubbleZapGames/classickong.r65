@@ -515,12 +515,8 @@ far fn cutscene_update_platform(off: u16, ptr: u16, wdt: u8, dx: i8) {
     let mut hgt: u8 = 1;
 
     let mut i: u8 = 0;
-    loop {
-        if i >= wdt {
-            break;
-        }
-
-        let mut j: u8 = platform_anim_cnt[idx];
+    while i < wdt {
+        let j: u8 = platform_anim_cnt[idx];
         if j < hgt {
             let k: u16 = (j as u16) << 1;
             nametable1[pos] = platform_anim[k];
@@ -550,11 +546,7 @@ far fn cutscene_update_platform(off: u16, ptr: u16, wdt: u8, dx: i8) {
 
 far fn cutscene_intro_show_ladders() {
     let mut i: u16 = 0;
-    loop {
-        if i >= (LADDERS_MAX as u16) {
-            break;
-        }
-
+    while i < (LADDERS_MAX as u16) {
         if ladders_y[i] < 240 {
             oam_spr1(ladders_x[i], ladders_y[i],
                      ENEMY_TILE + 0x0E | ENEMY_ATR,
