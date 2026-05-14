@@ -565,8 +565,7 @@ far fn set_background(n: u8) {
     }
 
     // Copy modified background graphics from RAM buffer to VRAM
-    set_dma_src(&back_buffer as u16, RAM_BANK);
-    copy_to_vram(0x4000, 24576);
+    dma_copy_vram_const!(7, back_buffer, 0x4000, 24576);
 
     // Set background palette (palette 7, colors 112-127)
     set_palette(112, 16, &back1_pal as far *u16);

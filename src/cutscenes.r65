@@ -706,8 +706,7 @@ far fn cutscene_intro() {
         nmi_wait();
 
         // Copy nametable to VRAM (platform bending updates nametable1)
-        set_dma_src(&nametable1 as u16, RAM_BANK);
-        copy_to_vram(0x0000, 2048);
+        dma_copy_vram_const!(7, nametable1, 0x0000, 2048);
 
         if bright < 15 {
             bright++;
