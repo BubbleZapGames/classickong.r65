@@ -215,36 +215,6 @@ far fn test_map(x: u8, y: u16) -> u8 {
 
 
 // ============================================================================
-// FUNCTION: Initialize Player
-// ============================================================================
-
-far fn player_init() {
-    player_x = 32;
-    player_y = 192;
-    player_dir = DIR_RIGHT;
-    player_dir_prev = DIR_RIGHT;
-    player_step = 0;
-    player_jump = JUMP_NONE;
-    player_jump_cnt = 0;
-    player_fall = FALSE;
-    player_fall_sound = 0;
-    player_ladder = FALSE;
-    player_speed_div = 0;
-    player_rivet_delay = 0;
-    player_hammer_time = 0;
-    player_hammer_phase = 0;
-    player_hammer_cnt = 0;
-
-    // Set initial animation
-    if game_flip == 0 {
-        player_anim = player_walk_anim_right[0];
-    } else {
-        player_anim = player_walk_anim_left[0];
-    }
-}
-
-
-// ============================================================================
 // FUNCTION: Horizontal Speed Divider (skip frames for slower movement)
 // Returns 0 if should skip this frame, non-zero if should move
 // ============================================================================
@@ -851,37 +821,4 @@ far fn player_update(pad: u16) -> u8 {
     player_update_oam();
 
     return 0;
-}
-
-
-// ============================================================================
-// FUNCTION: Play Player Death Animation
-// ============================================================================
-
-far fn player_death_animation() {
-    let mut frame: u8 = 0;
-    let mut counter: u8 = 0;
-
-    loop {
-        nmi_wait();
-
-        // Update animation every 8 frames
-        counter++;
-        if counter >= 8 {
-            counter = 0;
-            frame++;
-            if frame >= 4 {
-                frame = 0;
-            }
-        }
-
-        // Display death animation sprite
-        oam_spr1(player_x, player_y - 1, player_lose_anim[frame], OAM_PLAYER);
-
-        // Run for about 2 seconds (120 frames)
-        if frame == 0 && counter == 0 {
-            // Check if we've looped a few times
-            break;
-        }
-    }
 }

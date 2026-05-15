@@ -590,15 +590,3 @@ far fn elevators_process() -> u8 {
     }
     return floor_after;
 }
-
-
-// ============================================================================
-// FUNCTION: Initialize Item/Particle System
-// ============================================================================
-
-far fn items_init() {
-    items_clear();
-    particles_clear();
-    elevators_clear();
-    particle_free = 0;
-}

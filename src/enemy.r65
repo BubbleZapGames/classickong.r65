@@ -1231,28 +1231,3 @@ far fn process_splat() -> u8 {
         return FALSE;
     }
 }
-
-
-// ============================================================================
-// FUNCTION: Initialize Enemy System
-// ============================================================================
-
-far fn enemy_init() {
-    enemy_clear();
-    game_fireballs = 0;
-    game_fireballs_max = 5;
-    game_level_difficulty = 0;
-    game_object_jump = 0;
-    game_bounce_speed = 0;
-    barrel_fire = FALSE;
-    barrel_fire_x = 32;
-    barrel_fire_y = 192;
-    splat_cnt = 255;
-
-    conveyor_dir[0] = 0;
-    conveyor_dir[1] = 0;
-    conveyor_dir[2] = 0;
-    conveyor_items[0] = 0;
-    conveyor_items[1] = 0;
-    conveyor_items[2] = 0;
-}

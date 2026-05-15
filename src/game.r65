@@ -293,15 +293,6 @@ far fn set_palette(start: u16, count: u16, src: far *u16) {
 
 
 // ============================================================================
-// FUNCTION: Set Single Palette Color
-// ============================================================================
-
-far fn set_color(index: u16, color: u16) {
-    palette_buffer[X] = color;
-}
-
-
-// ============================================================================
 // FUNCTION: Update Palette to VRAM via DMA
 // ============================================================================
 
@@ -315,10 +306,10 @@ far fn update_palette() {
 
 
 // ============================================================================
-// FUNCTION: Copy Data to VRAM via DMA
+// FUNCTION: DMA Source Address Helpers
 // ============================================================================
-// NOTE: Uses zeropage variables for source address to avoid far pointer
-// parameter passing bug in the compiler.
+// Shared zeropage source-address state used by copy_from_vram and copy_mem.
+// VRAM uploads now use stdlib `dma_copy_vram` directly.
 
 // Explicitly allocate at safe addresses to avoid being corrupted by
 // buggy array index codegen (joypad_state[0]=0 writes to $00 instead of $0200)
@@ -327,27 +318,6 @@ static mut dma_src_addr: u16;
 
 #[zeropage(0x16)]
 static mut dma_src_bank: u8;
-
-far fn copy_to_vram(vram_addr @ X: u16, size @ Y: u16) {
-    // Set VRAM address - use 16-bit store since VMADDL/VMADDH are contiguous
-    asm!("STX $2116");  // 16-bit store to VMADDL ($2116) + VMADDH ($2117)
-    VMAIN = 0x80;  // Increment after high byte
-
-    // DMA setup
-    DMAP7 = 0x01;  // 2 registers (L, H)
-    BBAD7 = 0x18;  // $2118 = VMDATAL
-
-    // Set DMA source address from zeropage variables
-    // Use inline assembly to directly copy zeropage bytes (avoids compiler codegen issues)
-    asm!("LDA dma_src_bank", "STA $4374");   // Bank -> A1B7
-    asm!("LDA dma_src_addr", "STA $4372");   // Low byte -> A1T7L
-    asm!("LDA dma_src_addr+1", "STA $4373"); // High byte -> A1T7H
-
-    // DMA size - use 16-bit store since DAS7L/DAS7H are contiguous
-    asm!("STY $4375");  // 16-bit store to DAS7L ($4375) + DAS7H ($4376)
-
-    MDMAEN = 0x80;
-}
 
 // Helper function to set DMA source address
 far fn set_dma_src(addr: u16, bank: u8) {
@@ -1430,21 +1400,6 @@ far fn game_update_vram_animation() {
         if game_bg_anim >= 512 * 4 {
             game_bg_anim = 0;
         }
-    }
-}
-
-
-// ============================================================================
-// FUNCTION: Play Ladder Climbing Sound
-// ============================================================================
-
-far fn game_ladder_sound() {
-    let mut off: u8 = player_step & 7;
-    if off == 0 {
-        sfx_play(SFX_CHN, SFX_LADDER1, player_x as u16);
-    }
-    if off == 4 {
-        sfx_play(SFX_CHN, SFX_LADDER2, player_x as u16);
     }
 }
 
