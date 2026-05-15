@@ -337,15 +337,16 @@ far fn full_title_screen() -> u8 {
 // FUNCTION: Level Start Cutscene (How High Can You Get)
 // ============================================================================
 
-// Static arrays for cutscene animation (compiler doesn't support stack arrays with initializers)
 far fn cutscene_level() {
 
-    let mut stack_y: [i16; 4];
-    let mut stack_ty: [i16; 4];
-    let mut stack_dy: [i16; 4];
-    let mut stack_frame: [u8; 4];
-    let mut stack_jump: [u8; 4];
-    let mut stack_delay: [u8; 4];
+    // Kong-stack animation state. Fixed-point 10.6 (pixels << 6).
+    // C original: ty = (64+40*2)<<6 = 9216, y = -32<<6 = -2048.
+    let mut stack_y: [i16; 4] = [-2048, -2048, -2048, -2048];
+    let mut stack_ty: [i16; 4] = [9216, 6656, 4096, 1536];
+    let mut stack_dy: [i16; 4] = [0, 0, 0, 0];
+    let mut stack_frame: [u8; 4] = [0, 0, 0, 0];
+    let mut stack_jump: [u8; 4] = [0, 0, 0, 0];
+    let mut stack_delay: [u8; 4] = [0, 25, 50, 75];
 
     set_bright(0);
     setup_hdma_gradient(0xFF);
@@ -395,16 +396,6 @@ far fn cutscene_level() {
     spc_volume(global_volume);
 
     // Simple animation: Kong drops in from above
-    // Initialize local arrays (using static storage for array data)
-    // Note: Compiler doesn't support stack-allocated arrays with initializers
-    // Fixed-point 10.6 format (multiply pixel values by 64)
-    // C original: y = (64+40*2)<<6 = 9216, stack_y = -32<<6 = -2048
-    stack_y[0] = -2048; stack_y[1] = -2048; stack_y[2] = -2048; stack_y[3] = -2048;
-    stack_ty[0] = 9216; stack_ty[1] = 6656; stack_ty[2] = 4096; stack_ty[3] = 1536;
-    stack_dy[0] = 0; stack_dy[1] = 0; stack_dy[2] = 0; stack_dy[3] = 0;
-    stack_frame[0] = 0; stack_frame[1] = 0; stack_frame[2] = 0; stack_frame[3] = 0;
-    stack_jump[0] = 0; stack_jump[1] = 0; stack_jump[2] = 0; stack_jump[3] = 0;
-    stack_delay[0] = 0; stack_delay[1] = 25; stack_delay[2] = 50; stack_delay[3] = 75;
 
     for frame in 0..250 {
         nmi_wait();
