@@ -274,8 +274,6 @@ far fn pad_poll_trigger(joy: u16) -> u16 {
 // ============================================================================
 // FUNCTION: Set Palette Entries
 // ============================================================================
-// NOTE: Uses zeropage variables for source address to avoid far pointer
-// parameter passing bug in the compiler.
 
 // Copy `count` 16-bit colors from `src` into palette_buffer starting at
 // color index `start`. Mirrors C set_palette (sneslib.h:224):
@@ -311,25 +309,20 @@ far fn update_palette() {
 // Shared zeropage source-address state used by copy_from_vram and copy_mem.
 // VRAM uploads now use stdlib `dma_copy_vram` directly.
 
-// Explicitly allocate at safe addresses to avoid being corrupted by
-// buggy array index codegen (joypad_state[0]=0 writes to $00 instead of $0200)
-#[zeropage(0x14)]
+#[zeropage]
 static mut dma_src_addr: u16;
 
-#[zeropage(0x16)]
+#[zeropage]
 static mut dma_src_bank: u8;
 
-// Helper function to set DMA source address
-far fn set_dma_src(addr: u16, bank: u8) {
-    dma_src_addr = addr;
-    dma_src_bank = bank;
+// Helper function to set DMA source address from a far pointer.
+// Bank and 16-bit address are derived from the pointer itself, so callers
+// cannot pass a stale/mismatched bank constant.
+far fn set_dma_src(src: far *u8) {
+    dma_src_addr = src as u16;
+    dma_src_bank = src.bank_byte();
 }
 
-// Bank constants for ROM data (LoROM: bank number = CPU bank for $8000+ range)
-const DATA_BANK_1: u8 = 0x01;  // font, tilesets, sprites, palettes
-const DATA_BANK_2: u8 = 0x02;  // back1_gfx
-const DATA_BANK_4: u8 = 0x04;  // title graphics, bzlogo
-const DATA_BANK_5: u8 = 0x05;  // HDMA tables, flip_table
 const RAM_BANK: u8 = 0x7E;     // Main SNES RAM ($7E0000-$7FFFFF)
 
 
@@ -434,7 +427,7 @@ far fn set_background(n: u8) {
 
     // Copy previously uploaded front layer graphics from VRAM to RAM buffer
     // back_buffer is at $7E_xxxx, use dma_src_addr/bank as CPU-side destination
-    set_dma_src(&back_buffer as u16, RAM_BANK);
+    set_dma_src(&back_buffer as far *u8);
     copy_from_vram(0x1400, tiles_all << 5);
 
     // Convert front layer tiles to mask in back_graphics
@@ -473,7 +466,7 @@ far fn set_background(n: u8) {
     }
 
     // Copy background image from ROM to RAM buffer (back_buffer)
-    set_dma_src(&back1_gfx as u16, DATA_BANK_2);
+    set_dma_src(&back1_gfx as far *u8);
     set_wram_addr(&back_buffer as u16, RAM_BANK);
     copy_mem(24576);
 

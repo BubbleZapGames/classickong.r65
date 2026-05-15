@@ -953,14 +953,13 @@ far fn process_bounce(i: u8, spr: u16) -> u8 {
 // ============================================================================
 
 far fn enemy_check_player_collision(ox: u8, oy: u16) -> u8 {
-    // Alternating frame collision checks
-    if (game_frame_cnt & 1) != 0 {
-        if player_y + 12 > oy + 4 {
-            if player_y + 4 < oy + 12 {
-                if player_x + 12 > ox + 4 {
-                    if player_x + 4 < ox + 12 {
-                        return TRUE;
-                    }
+    // Caller already gates on the odd-frame alternation (enemy.h:686);
+    // no inner frame check needed.
+    if player_y + 12 > oy + 4 {
+        if player_y + 4 < oy + 12 {
+            if player_x + 12 > ox + 4 {
+                if player_x + 4 < ox + 12 {
+                    return TRUE;
                 }
             }
         }
@@ -1143,7 +1142,9 @@ far fn enemy_process() -> u8 {
                     if conveyor_dir[2] != 0 { enemy_ix[i]++; } else { enemy_ix[i]--; }
                 }
 
-                // Check if pan went off screen
+                // Check if pan went off screen (re-read: the moves above
+                // updated enemy_ix[i]; the stale snapshot would lag a frame)
+                dx = enemy_ix[i];
                 if dx < -16 || dx > 256 {
                     enemy_remove(i, FALSE);
                     etype = ENEMY_NONE;

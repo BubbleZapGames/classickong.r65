@@ -406,8 +406,7 @@ far fn cutscene_level() {
     stack_jump[0] = 0; stack_jump[1] = 0; stack_jump[2] = 0; stack_jump[3] = 0;
     stack_delay[0] = 0; stack_delay[1] = 25; stack_delay[2] = 50; stack_delay[3] = 75;
 
-    let mut frame: u16 = 0;
-    loop {
+    for frame in 0..250 {
         nmi_wait();
 
         // Fade in
@@ -417,11 +416,8 @@ far fn cutscene_level() {
         }
 
         // Animate Kong stacks
-        let mut j: u8 = 0;
-        loop {
-            if j > game_level {
-                break;
-            }
+        let j_end: u8 = game_level + 1;
+        for j in 0..j_end {
 
             if stack_delay[j] != 0 {
                 stack_delay[j]--;
@@ -459,8 +455,6 @@ far fn cutscene_level() {
             game_show_kong((j as u16) << 4, 112, stack_y[j] >> 6);
 
             } // end else (stack_delay == 0)
-
-            j++;
         }
 
         if delay_cnt != 0 {
@@ -471,10 +465,6 @@ far fn cutscene_level() {
         }
 
         game_frame_cnt++;
-        frame++;
-        if frame >= 250 {
-            break;
-        }
     }
 
     fade_screen(0, 1);
