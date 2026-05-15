@@ -812,13 +812,8 @@ far fn cutscene_levels_clear() {
     unrle(&mape_data as far *u8);
 
     // Copy map to nametable
-    let mut ptr: u16 = 0;
-    loop {
+    for ptr in 0..1024 {
         nametable1[ptr] = (map[ptr] as u16) + 0x0140 | BG_PAL!(1) | BG_PRI;
-        ptr++;
-        if ptr >= 1024 {
-            break;
-        }
     }
 
     // set_background(1) loads tileset1's level-1 palette into palette 1,
@@ -850,18 +845,12 @@ far fn cutscene_levels_clear() {
     setup_hdma_gradient(6);  // Enable victory-cutscene gradient (cutscenes.h:88)
 
     // Set all sprites to 16x16
-    let mut i: u16 = 0;
-    loop {
+    for i in 0..128 {
         oam_size(i << 2, 1);
-        i++;
-        if i >= 128 {
-            break;
-        }
     }
 
     spc_volume(global_volume);
 
-    let mut frame: u16 = 0;
     let mut fall_start: u8 = FALSE;
     let mut fall_ground: u8 = FALSE;
     let mut ky: i16 = (23 as i16) << 6;
@@ -883,7 +872,7 @@ far fn cutscene_levels_clear() {
     platform_hit[2] = 0;
     platform_hit[3] = 0;
 
-    loop {
+    for frame in 0..840 {
         nmi_wait();
 
         // Push the bridge area of the nametable (row 7, cols 8..23) every
@@ -1069,10 +1058,6 @@ far fn cutscene_levels_clear() {
         }
 
         game_frame_cnt++;
-        frame++;
-        if frame >= 840 {
-            break;
-        }
     }
 
     fade_screen(0, 1);
