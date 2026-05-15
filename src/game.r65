@@ -1373,8 +1373,7 @@ far fn game_wait_and_update_nametables() {
     nmi_wait();
 
     // Update stats row
-    set_dma_src(&nametable1 as *u8 as u16 + POS!(0, 1) * 2, 0x7E);
-    copy_to_vram(POS!(0, 1), 32 * 2);
+    dma_copy_vram(7, &nametable1[POS!(0, 1)] as far *u8, POS!(0, 1), 32 * 2);
 
     // Update lives if changed
     if game_lives_update != 0 {
@@ -1383,42 +1382,32 @@ far fn game_wait_and_update_nametables() {
         if game_flip != 0 {
             x = 1;
         }
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(x, 2) * 2, 0x7E);
-        copy_to_vram(POS!(x, 2), 10 * 2);
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(x, 3) * 2, 0x7E);
-        copy_to_vram(POS!(x, 3), 10 * 2);
+        dma_copy_vram(7, &nametable1[POS!(x, 2)] as far *u8, POS!(x, 2), 10 * 2);
+        dma_copy_vram(7, &nametable1[POS!(x, 3)] as far *u8, POS!(x, 3), 10 * 2);
     }
 
     // Update burning barrel (level 1) — same pattern as the conveyor/rivet
     // updates above, matching the C original at game_loop.h:541-544.
     if game_level == 0 {
         let fire_pos: u16 = POS!((barrel_fire_x >> 3) as u16, (barrel_fire_y >> 3) as u16);
-        set_dma_src(&nametable1 as *u8 as u16 + fire_pos * 2, 0x7E);
-        copy_to_vram(fire_pos, 4);
+        dma_copy_vram(7, &nametable1[fire_pos] as far *u8, fire_pos, 4);
     }
 
     // Update conveyor belts if changed
     if game_belts_update != 0 {
         game_belts_update = FALSE;
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(3, 7) * 2, 0x7E);
-        copy_to_vram(POS!(3, 7), 26 * 2);
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(0, 13) * 2, 0x7E);
-        copy_to_vram(POS!(0, 13), 32 * 2);
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(0, 22) * 2, 0x7E);
-        copy_to_vram(POS!(0, 22), 32 * 2);
+        dma_copy_vram(7, &nametable1[POS!(3, 7)] as far *u8, POS!(3, 7), 26 * 2);
+        dma_copy_vram(7, &nametable1[POS!(0, 13)] as far *u8, POS!(0, 13), 32 * 2);
+        dma_copy_vram(7, &nametable1[POS!(0, 22)] as far *u8, POS!(0, 22), 32 * 2);
     }
 
     // Update rivets if changed
     if game_rivets_update != 0 {
         game_rivets_update = FALSE;
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 7) * 2, 0x7E);
-        copy_to_vram(POS!(8, 7), 16 * 2);
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 12) * 2, 0x7E);
-        copy_to_vram(POS!(8, 12), 16 * 2);
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 17) * 2, 0x7E);
-        copy_to_vram(POS!(8, 17), 16 * 2);
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 22) * 2, 0x7E);
-        copy_to_vram(POS!(8, 22), 16 * 2);
+        dma_copy_vram(7, &nametable1[POS!(8, 7)] as far *u8, POS!(8, 7), 16 * 2);
+        dma_copy_vram(7, &nametable1[POS!(8, 12)] as far *u8, POS!(8, 12), 16 * 2);
+        dma_copy_vram(7, &nametable1[POS!(8, 17)] as far *u8, POS!(8, 17), 16 * 2);
+        dma_copy_vram(7, &nametable1[POS!(8, 22)] as far *u8, POS!(8, 22), 16 * 2);
     }
 }
 
@@ -1430,11 +1419,10 @@ far fn game_wait_and_update_nametables() {
 far fn game_update_vram_animation() {
     // Copy animated tileset from ROM to VRAM at $1800
     if game_level != 1 {
-        set_dma_src((&tileset2_gfx as *u8 as u16) + game_bg_anim, DATA_BANK_1);
+        dma_copy_vram(7, &tileset2_gfx[game_bg_anim] as far *u8, 0x1800, 512);
     } else {
-        set_dma_src((&tileset2alt_gfx as *u8 as u16) + game_bg_anim, DATA_BANK_1);
+        dma_copy_vram(7, &tileset2alt_gfx[game_bg_anim] as far *u8, 0x1800, 512);
     }
-    copy_to_vram(0x1800, 512);
 
     // Update animation counter (advance every 4 frames)
     if (game_frame_cnt & 3) == 0 {

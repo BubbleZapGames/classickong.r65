@@ -907,8 +907,7 @@ far fn cutscene_levels_clear() {
 
         // Push the bridge area of the nametable (row 7, cols 8..23) every
         // frame so the in-progress bridge formation actually appears in VRAM.
-        set_dma_src(&nametable1 as *u8 as u16 + POS!(8, 7) * 2, 0x7E);
-        copy_to_vram(POS!(8, 7), 16 * 2);
+        dma_copy_vram(7, &nametable1[POS!(8, 7)] as far *u8, POS!(8, 7), 16 * 2);
 
         // Screen shake when Kong hits the ground (cutscenes.h:107-126).
         if shake_cnt != 0 {
