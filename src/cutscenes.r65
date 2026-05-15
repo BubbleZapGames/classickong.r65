@@ -32,8 +32,8 @@ static height_str_75: [u8; 9] = " 75 M  $";
 static height_str_100: [u8; 9] = "100 M  $";
 
 // Cheat codes
-static test_code: [u16; 6] = [PAD_B, PAD_A, PAD_R, PAD_R, PAD_A, PAD_L];
-static hard_code: [u16; 8] = [PAD_B, PAD_A, PAD_DOWN, PAD_B, PAD_UP, PAD_DOWN, PAD_DOWN, PAD_Y];
+static test_code: [u16; 6] = [JOY_B, JOY_A, JOY_R, JOY_R, JOY_A, JOY_L];
+static hard_code: [u16; 8] = [JOY_B, JOY_A, JOY_DOWN, JOY_B, JOY_UP, JOY_DOWN, JOY_DOWN, JOY_Y];
 
 // UI strings
 static str_press_start: [u8; 12] = "PRESS START";
@@ -255,12 +255,12 @@ far fn full_title_screen() -> u8 {
         let trig: u16 = pad_poll_trigger(0);
 
         // Start button pressed
-        if bright == 15 && (trig & PAD_START) != 0 {
+        if bright == 15 && (trig & JOY_START) != 0 {
             break;
         }
 
         // Select changes stereo mode
-        if (trig & PAD_SELECT) != 0 {
+        if (trig & JOY_SELECT) != 0 {
             global_stereo = global_stereo ^ 1;
             spc_stereo(global_stereo);
             sfx_play(SFX_CHN+2, SFX_ITEM, 128);
@@ -316,7 +316,7 @@ far fn full_title_screen() -> u8 {
     // Check if A+B held for skip intro
     let pad: u16 = pad_poll(0);
     let mut skip: u8 = FALSE;
-    if (pad & PAD_A) != 0 && (pad & PAD_B) != 0 {
+    if (pad & JOY_A) != 0 && (pad & JOY_B) != 0 {
         skip = TRUE;
     }
 
@@ -1305,7 +1305,7 @@ far fn sound_test() {
         let trig: u16 = pad_poll_trigger(0);
 
         // Navigate menu
-        if (trig & PAD_UP) != 0 {
+        if (trig & JOY_UP) != 0 {
             if cur == 0 {
                 cur = 4;
             } else {
@@ -1313,7 +1313,7 @@ far fn sound_test() {
             }
         }
 
-        if (trig & PAD_DOWN) != 0 {
+        if (trig & JOY_DOWN) != 0 {
             cur++;
             if cur > 4 {
                 cur = 0;
@@ -1321,7 +1321,7 @@ far fn sound_test() {
         }
 
         // Decrease values
-        if (trig & PAD_LEFT) != 0 {
+        if (trig & JOY_LEFT) != 0 {
             if cur == 0 {
                 if sound == 0 {
                     sound = SOUNDS_ALL - 1;
@@ -1351,7 +1351,7 @@ far fn sound_test() {
         }
 
         // Increase values
-        if (trig & PAD_RIGHT) != 0 {
+        if (trig & JOY_RIGHT) != 0 {
             if cur == 0 {
                 sound++;
                 if sound >= SOUNDS_ALL {
@@ -1379,7 +1379,7 @@ far fn sound_test() {
         }
 
         // Play sound/music
-        if (trig & PAD_A) != 0 {
+        if (trig & JOY_A) != 0 {
             if cur == 0 || cur == 1 {
                 sfx_play(7, sound, pan);
             } else if cur == 2 {
@@ -1390,7 +1390,7 @@ far fn sound_test() {
         }
 
         // Stop music
-        if (trig & PAD_B) != 0 {
+        if (trig & JOY_B) != 0 {
             music_stop();
             if cur == 4 {
                 done = TRUE;

@@ -378,7 +378,7 @@ far fn show_pal_warning() {
         pad_read_ports();
 
         let trig: u16 = pad_poll_trigger(0);
-        if trig & PAD_START != 0 {
+        if trig & JOY_START != 0 {
             break;
         }
     }
@@ -869,7 +869,7 @@ far fn game_loop() -> u8 {
         let trig: u16 = pad_poll_trigger(0);
 
         // Pause toggle
-        if start_delay == 0 && (trig & PAD_START) != 0 {
+        if start_delay == 0 && (trig & JOY_START) != 0 {
             pause = pause ^ TRUE;
             sfx_play(SFX_CHN, SFX_PAUSE, 128);
         }
@@ -903,7 +903,7 @@ far fn game_loop() -> u8 {
         let pad: u16 = pad_poll(0);
 
         // Test mode: SELECT skips level
-        if game_test_mode != 0 && (pad & PAD_SELECT) != 0 {
+        if game_test_mode != 0 && (pad & JOY_SELECT) != 0 {
             clear = LEVEL_CLEAR;
             break;
         }

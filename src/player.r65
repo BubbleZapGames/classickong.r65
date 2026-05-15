@@ -322,7 +322,7 @@ far fn player_process_ground(pad: u16) {
     player_dir = DIR_NONE;
 
     // Left movement
-    if pad & PAD_LEFT != 0 {
+    if pad & JOY_LEFT != 0 {
         if player_x >= player_clip_left() {
             if player_horz_div(3) != 0 {
                 player_x--;
@@ -333,7 +333,7 @@ far fn player_process_ground(pad: u16) {
     }
 
     // Right movement
-    if pad & PAD_RIGHT != 0 {
+    if pad & JOY_RIGHT != 0 {
         if player_x <= player_clip_right() {
             if player_horz_div(3) != 0 {
                 player_x++;
@@ -412,7 +412,7 @@ far fn player_check_ladder(pad: u16) {
     }
 
     // Check for UP input
-    if pad & PAD_UP != 0 {
+    if pad & JOY_UP != 0 {
         floor1 = test_map(player_x + 7, player_y + 15);
         floor2 = test_map(player_x + 9, player_y + 15);
 
@@ -426,7 +426,7 @@ far fn player_check_ladder(pad: u16) {
     }
 
     // Check for DOWN input
-    if pad & PAD_DOWN != 0 {
+    if pad & JOY_DOWN != 0 {
         floor1 = test_map(player_x + 7, player_y + 16);
         floor2 = test_map(player_x + 9, player_y + 16);
 
@@ -452,7 +452,7 @@ far fn player_process_ladder(pad: u16) {
     let mut off: u8;
 
     // Climb UP
-    if pad & PAD_UP != 0 {
+    if pad & JOY_UP != 0 {
         floor1 = test_map(x, player_y + 15);
 
         // Check for broken ladder (can't pass)
@@ -474,7 +474,7 @@ far fn player_process_ladder(pad: u16) {
     }
 
     // Climb DOWN
-    if pad & PAD_DOWN != 0 {
+    if pad & JOY_DOWN != 0 {
         floor1 = test_map(x, player_y + 16);
 
         if (floor1 & T_LADDER_BROKEN) == 0 {
@@ -594,7 +594,7 @@ far fn player_process_jump(pad: u16) {
 
     if player_jump == JUMP_NONE {
         // Check for jump button press
-        if (pad & (PAD_A | PAD_B)) != 0 {
+        if (pad & (JOY_A | JOY_B)) != 0 {
             if player_ladder == FALSE {
                 if player_fall == FALSE {
                     if player_hammer_time == 0 {
@@ -615,8 +615,8 @@ far fn player_process_jump(pad: u16) {
         }
     } else if player_jump == JUMP_LAND || player_jump == JUMP_DUMMY {
         // Wait for button release
-        if (pad & PAD_A) == 0 {
-            if (pad & PAD_B) == 0 {
+        if (pad & JOY_A) == 0 {
+            if (pad & JOY_B) == 0 {
                 player_jump = JUMP_NONE;
             }
         }

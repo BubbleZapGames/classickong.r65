@@ -129,24 +129,7 @@ static mut back_buffer: [u16; 12288];  // 24KB / 2 = 12288 words
 static mut back_graphics: [u16; 3072];  // Mask graphics buffer
 
 
-// ============================================================================
-// CONSTANTS - Joypad Buttons
-// ============================================================================
-// Note: These are equivalent to JOY_* constants in sneslib.r65
-// Using PAD_* naming for consistency with original codebase
-
-const PAD_B: u16 = 0x8000;
-const PAD_Y: u16 = 0x4000;
-const PAD_SELECT: u16 = 0x2000;
-const PAD_START: u16 = 0x1000;
-const PAD_UP: u16 = 0x0800;
-const PAD_DOWN: u16 = 0x0400;
-const PAD_LEFT: u16 = 0x0200;
-const PAD_RIGHT: u16 = 0x0100;
-const PAD_A: u16 = 0x0080;
-const PAD_X: u16 = 0x0040;
-const PAD_L: u16 = 0x0020;
-const PAD_R: u16 = 0x0010;
+// Joypad button masks (JOY_*) are provided by sneslib.r65.
 
 
 // ============================================================================
