@@ -7,6 +7,14 @@ MAIN_SRC = src/main.r65
 BUILD_DIR = build
 ROM_FILE = $(BUILD_DIR)/$(PROJECT).smc
 
+# All R65 sources (recursive). main.r65 pulls the rest in via include!,
+# so every .r65 file must be a prerequisite or `make` misses edits to
+# include!d files (game.r65, cutscenes.r65, enemy.r65, ...).
+# Pure GNU Make recursive wildcard (no `find`) so this works on
+# Windows (mingw/MSYS make) as well as Linux/macOS.
+rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2)$(filter $(subst *,%,$2),$d))
+R65_SRCS = $(call rwildcard,src,*.r65)
+
 # Tools
 R65C = python -m r65.compiler.main
 WLA = wla-65816
@@ -20,7 +28,7 @@ R65C_FLAGS = -v --cfg snes --dbg
 all: $(ROM_FILE)
 
 # Compile R65 source to WLA-DX assembly
-$(BUILD_DIR)/main.asm: $(MAIN_SRC) $(wildcard src/lib/*.r65)
+$(BUILD_DIR)/main.asm: $(R65_SRCS)
 	@mkdir -p $(BUILD_DIR)
 	$(R65C) $(MAIN_SRC) -o $@ $(R65C_FLAGS)
 
