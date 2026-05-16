@@ -1083,15 +1083,10 @@ far fn cutscene_next_level() {
     game_show_kong(OAM_KONG, kong_x, kong_y);
 
     // Heart rises
-    let mut i: u8 = 0;
-    loop {
+    for i in 0..16 {
         nmi_wait();
         oam_spr(heart_x as u16, (heart_y as i16) + ((15 - i) >> 1) as i16,
                 PRINCESS_TILE + (((i & 2) ^ 2) as u16) + 0x0C | PRINCESS_ATR, OAM_PARTICLES);
-        i++;
-        if i >= 16 {
-            break;
-        }
     }
 
     delay(25);
@@ -1264,11 +1259,7 @@ far fn sound_test() {
     let mut cur: u8 = 0;
     let mut done: u8 = FALSE;
 
-    loop {
-        if done != FALSE {
-            break;
-        }
-
+    while done == FALSE {
         // Display current values
         put_num(POS!(19, 10), sound as u16, 2);
         put_num(POS!(18, 11), pan as u16, 3);
@@ -1276,18 +1267,12 @@ far fn sound_test() {
         put_num(POS!(18, 13), global_volume as u16, 3);
 
         // Draw cursor
-        let mut off: u16 = POS!(9, 10);
-        let mut row: u8 = 0;
-        loop {
+        for row in 0..5 {
+            let off: u16 = POS!(9, 10) + (row as u16) * 0x20;  // +32 per row
             if row == cur {
                 nametable1[off] = TEXT_ATR | (0x40 - 32) as u16;  // '@' - 32 = 0x20
             } else {
                 nametable1[off] = TEXT_ATR;
-            }
-            off = off + 0x20;  // Next row = +32
-            row++;
-            if row >= 5 {
-                break;
             }
         }
 
