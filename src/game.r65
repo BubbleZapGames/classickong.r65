@@ -315,29 +315,25 @@ const RAM_BANK: u8 = 0x7E;     // Main SNES RAM ($7E0000-$7FFFFF)
 // Destination RAM address is set via dma_src_addr/dma_src_bank (reused as CPU-side addr).
 
 far fn copy_from_vram(vram_addr @ X: u16, size @ Y: u16) {
-    // Set VRAM address
-    VMAIN = 0x80;  // Increment after high byte
-    asm!("STX $2116");  // 16-bit store to VMADDL/VMADDH
+    // Set VRAM read address (increment after high-byte access)
+    set_vram_inc!(VmainTrigger::High);
+    set_vram_addr!(vram_addr);
 
-    // Dummy read to prime the VRAM read buffer (required by SNES PPU)
-    asm!(
-        "LDA $2139",       // Dummy read VMDATALREAD (primes buffer)
-        "LDA $213A"        // Dummy read VMDATAHREAD
-    );
+    // Prime the PPU VRAM read latch (required before the first real read)
+    A = VMDATALREAD;
+    A = VMDATAHREAD;
 
-    // DMA setup: read from VRAM to CPU
-    DMAP7 = 0x81;  // direction=PPU→CPU, mode=1 (two registers)
-    BBAD7 = 0x39;  // $2139 = VMDATALREAD
+    // DMA channel 7: VRAM (PPU) -> CPU, two-register mode, src = VMDATALREAD
+    dma_set_ppu_dest!(7, 129, 57);  // 129 = mode1|to-CPU ($81), 57 = $2139 ($39)
 
-    // Set DMA destination (CPU-side) address from zeropage variables
-    asm!("LDA dma_src_bank", "STA $4374");   // Bank -> A1B7
-    asm!("LDA dma_src_addr", "STA $4372");   // Low byte -> A1T7L
-    asm!("LDA dma_src_addr+1", "STA $4373"); // High byte -> A1T7H
+    // CPU-side destination address (set by caller via set_dma_src)
+    A1T7 = dma_src_addr;
+    A1B7 = dma_src_bank;
 
-    // DMA size
-    asm!("STY $4375");  // 16-bit store to DAS7L/DAS7H
+    // Transfer size
+    DAS7 = size;
 
-    MDMAEN = 0x80;
+    dma_trigger!(7);
 }
 
 
