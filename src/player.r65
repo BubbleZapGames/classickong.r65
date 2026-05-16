@@ -380,20 +380,24 @@ far fn player_process_ground(pad: u16) {
     // direction resets the sprite from the airborne jump-frame back to the
     // standing frame. Without this reset player_anim would stay stuck in
     // the jump pose until the player walked.
-    if player_dir == DIR_LEFT {
-        let mut frame: u8 = mod8((player_step >> 2) as u8, 6);
-        player_anim = player_walk_anim_left[frame];
-    } else if player_dir == DIR_RIGHT {
-        let mut frame: u8 = mod8((player_step >> 2) as u8, 6);
-        player_anim = player_walk_anim_right[frame];
-    } else {
-        // Idle: standing frame, facing the previous direction
-        if player_dir_prev == DIR_LEFT {
-            player_anim = player_walk_anim_left[0];
-        } else {
-            player_anim = player_walk_anim_right[0];
-        }
-    }
+    match player_dir {
+        DIR_LEFT => {
+            let mut frame: u8 = mod8((player_step >> 2) as u8, 6);
+            player_anim = player_walk_anim_left[frame];
+        },
+        DIR_RIGHT => {
+            let mut frame: u8 = mod8((player_step >> 2) as u8, 6);
+            player_anim = player_walk_anim_right[frame];
+        },
+        _ => {
+            // Idle: standing frame, facing the previous direction
+            if player_dir_prev == DIR_LEFT {
+                player_anim = player_walk_anim_left[0];
+            } else {
+                player_anim = player_walk_anim_right[0];
+            }
+        },
+    };
 }
 
 
@@ -591,75 +595,80 @@ far fn player_process_jump(pad: u16) {
     let mut dy: i8;
     let mut floor1: u8;
 
-    if player_jump == JUMP_NONE {
-        // Check for jump button press
-        if (pad & (JOY_A | JOY_B)) != 0 {
-            if player_ladder == FALSE {
-                if player_fall == FALSE {
-                    if player_hammer_time == 0 {
-                        // Start jump
-                        player_jump = JUMP_AIR;
-                        player_jump_cnt = 0;
-                        player_jump_y = player_y;
-                        sfx_play(SFX_CHN, SFX_HERO_JUMP, player_x + 8);
+    match player_jump {
+        JUMP_NONE => {
+            // Check for jump button press
+            if (pad & (JOY_A | JOY_B)) != 0 {
+                if player_ladder == FALSE {
+                    if player_fall == FALSE {
+                        if player_hammer_time == 0 {
+                            // Start jump
+                            player_jump = JUMP_AIR;
+                            player_jump_cnt = 0;
+                            player_jump_y = player_y;
+                            sfx_play(SFX_CHN, SFX_HERO_JUMP, player_x + 8);
+                        } else {
+                            player_jump = JUMP_DUMMY;
+                        }
                     } else {
                         player_jump = JUMP_DUMMY;
                     }
                 } else {
                     player_jump = JUMP_DUMMY;
                 }
-            } else {
-                player_jump = JUMP_DUMMY;
             }
-        }
-    } else if player_jump == JUMP_LAND || player_jump == JUMP_DUMMY {
-        // Wait for button release
-        if (pad & JOY_A) == 0 {
-            if (pad & JOY_B) == 0 {
-                player_jump = JUMP_NONE;
-            }
-        }
-    } else if player_jump == JUMP_AIR {
-        // Apply jump table velocity
-        dy = player_jump_table[player_jump_cnt];
-        player_jump_cnt++;
-
-        // Move player vertically
-        if dy < 0 {
-            player_y = player_y - ((-dy) as u8);
-        } else if dy > 0 {
-            player_y = player_y + (dy as u8);
-        }
-
-        // Check if jump is complete
-        if player_jump_cnt >= JUMP_TABLE_SIZE {
-            player_jump = JUMP_LAND;
-            player_fall = TRUE;
-            sfx_play(SFX_CHN, SFX_HERO_FALL, player_x);
-        }
-
-        // Check for floor collision during jump
-        if player_jump_cnt > 2 {
-            let mut i: u8 = 0;
-            loop {
-                floor1 = test_map(player_x + 8 - PLR_BBOX_HWDT, player_y + 16 - i);
-                let mut floor2: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16 - i);
-
-                if ((floor1 | floor2) & T_SOLID) != 0 {
-                    player_jump = JUMP_LAND;
-                    player_fall = TRUE;
-                    player_y = player_y - i;
-                    sfx_play(SFX_CHN, SFX_HERO_LANDS, player_x);
-                    break;
-                }
-
-                i++;
-                if i >= 2 {
-                    break;
+        },
+        JUMP_LAND | JUMP_DUMMY => {
+            // Wait for button release
+            if (pad & JOY_A) == 0 {
+                if (pad & JOY_B) == 0 {
+                    player_jump = JUMP_NONE;
                 }
             }
-        }
-    }
+        },
+        JUMP_AIR => {
+            // Apply jump table velocity
+            dy = player_jump_table[player_jump_cnt];
+            player_jump_cnt++;
+
+            // Move player vertically
+            if dy < 0 {
+                player_y = player_y - ((-dy) as u8);
+            } else if dy > 0 {
+                player_y = player_y + (dy as u8);
+            }
+
+            // Check if jump is complete
+            if player_jump_cnt >= JUMP_TABLE_SIZE {
+                player_jump = JUMP_LAND;
+                player_fall = TRUE;
+                sfx_play(SFX_CHN, SFX_HERO_FALL, player_x);
+            }
+
+            // Check for floor collision during jump
+            if player_jump_cnt > 2 {
+                let mut i: u8 = 0;
+                loop {
+                    floor1 = test_map(player_x + 8 - PLR_BBOX_HWDT, player_y + 16 - i);
+                    let mut floor2: u8 = test_map(player_x + 8 + PLR_BBOX_HWDT, player_y + 16 - i);
+
+                    if ((floor1 | floor2) & T_SOLID) != 0 {
+                        player_jump = JUMP_LAND;
+                        player_fall = TRUE;
+                        player_y = player_y - i;
+                        sfx_play(SFX_CHN, SFX_HERO_LANDS, player_x);
+                        break;
+                    }
+
+                    i++;
+                    if i >= 2 {
+                        break;
+                    }
+                }
+            }
+        },
+        _ => {},
+    };
 }
 
 
@@ -679,32 +688,36 @@ far fn player_process_airborne() {
     }
 
     // Horizontal movement while airborne
-    if player_dir == DIR_LEFT {
-        player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR;
-
-        if player_horz_div(2) != 0 {
-            player_x--;
-            if player_x <= player_clip_left() {
-                player_dir = DIR_RIGHT;
-            }
-        }
-    } else if player_dir == DIR_RIGHT {
-        player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR | SPR_HFLIP;
-
-        if player_horz_div(2) != 0 {
-            player_x++;
-            if player_x >= player_clip_right() {
-                player_dir = DIR_LEFT;
-            }
-        }
-    } else {
-        // Neutral jump animation
-        if player_dir_prev == DIR_LEFT {
+    match player_dir {
+        DIR_LEFT => {
             player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR;
-        } else {
+
+            if player_horz_div(2) != 0 {
+                player_x--;
+                if player_x <= player_clip_left() {
+                    player_dir = DIR_RIGHT;
+                }
+            }
+        },
+        DIR_RIGHT => {
             player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR | SPR_HFLIP;
-        }
-    }
+
+            if player_horz_div(2) != 0 {
+                player_x++;
+                if player_x >= player_clip_right() {
+                    player_dir = DIR_LEFT;
+                }
+            }
+        },
+        _ => {
+            // Neutral jump animation
+            if player_dir_prev == DIR_LEFT {
+                player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR;
+            } else {
+                player_anim = PLAYER_TILE + 0x28 | PLAYER_ATR | SPR_HFLIP;
+            }
+        },
+    };
 }
 
 

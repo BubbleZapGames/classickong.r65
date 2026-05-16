@@ -385,13 +385,11 @@ far fn copy_mem(size @ Y: u16) {
 
 far fn set_background(n: u8) {
     // Select palette based on level
-    if n == 2 {
-        set_palette(16, 16, &tileset1alt1_pal as far *u16);
-    } else if n == 3 {
-        set_palette(16, 16, &tileset1alt2_pal as far *u16);
-    } else {
-        set_palette(16, 16, &tileset1_pal as far *u16);
-    }
+    match n {
+        2 => { set_palette(16, 16, &tileset1alt1_pal as far *u16); },
+        3 => { set_palette(16, 16, &tileset1alt2_pal as far *u16); },
+        _ => { set_palette(16, 16, &tileset1_pal as far *u16); },
+    };
 
     // If n == 0xFF (the sentinel), just clear VRAM and return
     if n == 0xFF {

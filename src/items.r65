@@ -176,29 +176,38 @@ far fn particle_add(ptype: u8, px: u8, py: u8) {
     particle_x[i] = px;
     particle_y[i] = py;
 
-    if ptype == PART_TYPE_100 {
-        cnt1 = 50;
-        spr = ITEMS_TILE + 0x20 | ITEM_ATR;
-    } else if ptype == PART_TYPE_300 {
-        cnt1 = 50;
-        spr = ITEMS_TILE + 0x0A | ITEM_ATR;
-    } else if ptype == PART_TYPE_500 {
-        cnt1 = 50;
-        spr = ITEMS_TILE + 0x0C | ITEM_ATR;
-    } else if ptype == PART_TYPE_800 {
-        cnt1 = 50;
-        spr = ITEMS_TILE + 0x0E | ITEM_ATR;
-    } else if ptype == PART_TYPE_HELP {
-        cnt1 = 32;
-        spr = PRINCESS_TILE + 0x08 | PRINCESS_ATR;
-    } else if ptype == PART_TYPE_SMOKE || ptype == PART_TYPE_SMOKE_UP {
-        cnt1 = 32;
-        spr = ENEMY_TILE + 0x40 | ENEMY_ATR;
-    } else if ptype == PART_TYPE_HEART {
-        cnt1 = 8;
-        cnt2 = 64;
-        spr = PRINCESS_TILE + 0x0C | PRINCESS_ATR;
-    }
+    match ptype {
+        PART_TYPE_100 => {
+            cnt1 = 50;
+            spr = ITEMS_TILE + 0x20 | ITEM_ATR;
+        },
+        PART_TYPE_300 => {
+            cnt1 = 50;
+            spr = ITEMS_TILE + 0x0A | ITEM_ATR;
+        },
+        PART_TYPE_500 => {
+            cnt1 = 50;
+            spr = ITEMS_TILE + 0x0C | ITEM_ATR;
+        },
+        PART_TYPE_800 => {
+            cnt1 = 50;
+            spr = ITEMS_TILE + 0x0E | ITEM_ATR;
+        },
+        PART_TYPE_HELP => {
+            cnt1 = 32;
+            spr = PRINCESS_TILE + 0x08 | PRINCESS_ATR;
+        },
+        PART_TYPE_SMOKE | PART_TYPE_SMOKE_UP => {
+            cnt1 = 32;
+            spr = ENEMY_TILE + 0x40 | ENEMY_ATR;
+        },
+        PART_TYPE_HEART => {
+            cnt1 = 8;
+            cnt2 = 64;
+            spr = PRINCESS_TILE + 0x0C | PRINCESS_ATR;
+        },
+        _ => {},
+    };
 
     particle_cnt1[i] = cnt1;
     particle_cnt2[i] = cnt2;
@@ -223,91 +232,98 @@ far fn particle_process() {
     loop {
         let ptype: u8 = particle_type[i];
 
-        if ptype == PART_TYPE_NONE {
-            oam_spr1(0, 240, 0, spr);
-        } else if ptype == PART_TYPE_100 || ptype == PART_TYPE_300 ||
-           ptype == PART_TYPE_500 || ptype == PART_TYPE_800 {
-            // Score particles rise slowly
-            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
+        match ptype {
+            PART_TYPE_NONE => {
+                oam_spr1(0, 240, 0, spr);
+            },
+            PART_TYPE_100 | PART_TYPE_300 | PART_TYPE_500 | PART_TYPE_800 => {
+                // Score particles rise slowly
+                oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
 
-            particle_cnt1[i]--;
+                particle_cnt1[i]--;
 
-            if particle_cnt1[i] == 0 {
-                particle_clear(i);
-            } else {
-                if (frame & 1) != 0 {
-                    particle_y[i]--;
-                }
-            }
-        } else if ptype == PART_TYPE_HELP {
-            // Help text rises slower
-            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
-
-            particle_cnt1[i]--;
-
-            if particle_cnt1[i] == 0 {
-                particle_clear(i);
-            } else {
-                if (frame & 3) == 0 {
-                    particle_y[i]--;
-                }
-            }
-        } else if ptype == PART_TYPE_SMOKE_UP {
-            // Rising smoke
-            particle_y[i]--;
-
-            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
-
-            particle_cnt1[i]--;
-
-            if particle_cnt1[i] == 0 {
-                particle_clear(i);
-            } else {
-                if (particle_cnt1[i] & 3) == 0 {
-                    particle_spr[i] = particle_spr[i] + 2;
-                }
-            }
-        } else if ptype == PART_TYPE_SMOKE {
-            // Stationary smoke
-            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
-
-            particle_cnt1[i]--;
-
-            if particle_cnt1[i] == 0 {
-                particle_clear(i);
-            } else {
-                if (particle_cnt1[i] & 3) == 0 {
-                    particle_spr[i] = particle_spr[i] + 2;
-                }
-            }
-        } else if ptype == PART_TYPE_HEART {
-            // Heart floats up and sways
-            oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
-
-            if (particle_cnt2[i] & 3) == 0 && (frame & 1) != 0 {
-                particle_y[i]--;
-            }
-
-            if particle_cnt2[i] == 0 {
-                if (particle_cnt1[i] & 16) != 0 {
-                    particle_x[i]--;
+                if particle_cnt1[i] == 0 {
+                    particle_clear(i);
                 } else {
-                    particle_x[i]++;
+                    if (frame & 1) != 0 {
+                        particle_y[i]--;
+                    }
                 }
-            }
+            },
+            PART_TYPE_HELP => {
+                // Help text rises slower
+                oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
 
-            particle_cnt1[i]++;
+                particle_cnt1[i]--;
 
-            if particle_cnt2[i] != 0 {
-                particle_cnt2[i] = particle_cnt2[i] - 2;
-            }
+                if particle_cnt1[i] == 0 {
+                    particle_clear(i);
+                } else {
+                    if (frame & 3) == 0 {
+                        particle_y[i]--;
+                    }
+                }
+            },
+            PART_TYPE_SMOKE_UP => {
+                // Rising smoke
+                particle_y[i]--;
 
-            particle_spr[i] = PRINCESS_TILE + 0x0C + (particle_cnt2[i] & 2) as u16 | PRINCESS_ATR;
+                oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
 
-            if particle_y[i] == 240 {
-                particle_clear(i);
-            }
-        }
+                particle_cnt1[i]--;
+
+                if particle_cnt1[i] == 0 {
+                    particle_clear(i);
+                } else {
+                    if (particle_cnt1[i] & 3) == 0 {
+                        particle_spr[i] = particle_spr[i] + 2;
+                    }
+                }
+            },
+            PART_TYPE_SMOKE => {
+                // Stationary smoke
+                oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
+
+                particle_cnt1[i]--;
+
+                if particle_cnt1[i] == 0 {
+                    particle_clear(i);
+                } else {
+                    if (particle_cnt1[i] & 3) == 0 {
+                        particle_spr[i] = particle_spr[i] + 2;
+                    }
+                }
+            },
+            PART_TYPE_HEART => {
+                // Heart floats up and sways
+                oam_spr1(particle_x[i], particle_y[i], particle_spr[i], spr);
+
+                if (particle_cnt2[i] & 3) == 0 && (frame & 1) != 0 {
+                    particle_y[i]--;
+                }
+
+                if particle_cnt2[i] == 0 {
+                    if (particle_cnt1[i] & 16) != 0 {
+                        particle_x[i]--;
+                    } else {
+                        particle_x[i]++;
+                    }
+                }
+
+                particle_cnt1[i]++;
+
+                if particle_cnt2[i] != 0 {
+                    particle_cnt2[i] = particle_cnt2[i] - 2;
+                }
+
+                particle_spr[i] = PRINCESS_TILE + 0x0C + (particle_cnt2[i] & 2) as u16 | PRINCESS_ATR;
+
+                if particle_y[i] == 240 {
+                    particle_clear(i);
+                }
+            },
+            _ => {},
+        };
 
         spr = spr + 4;
         i++;

@@ -356,54 +356,31 @@ static kong_anim_both: [u8; 6] = [
 
 far fn game_show_kong(oam_off: u16, kx: u8, ky: i16) {
     let anim_idx: u8 = kong_frame_idx;
-    let mut frame: far *u16;
-
     // Select frame data based on animation index
-    if anim_idx == KONG_ANIM_FACE1 {
-        frame = &kong_face1 as far *u16;
-    } else if anim_idx == KONG_ANIM_FACE2_BOTH {
-        frame = &kong_face2_both as far *u16;
-    } else if anim_idx == KONG_ANIM_FACE3_BOTH {
-        frame = &kong_face3_both as far *u16;
-    } else if anim_idx == KONG_ANIM_FACE4_BOTH {
-        frame = &kong_face4_both as far *u16;
-    } else if anim_idx == KONG_ANIM_FACE2_LEFT {
-        frame = &kong_face2_left as far *u16;
-    } else if anim_idx == KONG_ANIM_FACE3_LEFT {
-        frame = &kong_face3_left as far *u16;
-    } else if anim_idx == KONG_ANIM_FACE4_LEFT {
-        frame = &kong_face4_left as far *u16;
-    } else if anim_idx == KONG_ANIM_FACE2_RIGHT {
-        frame = &kong_face2_right as far *u16;
-    } else if anim_idx == KONG_ANIM_FACE3_RIGHT {
-        frame = &kong_face3_right as far *u16;
-    } else if anim_idx == KONG_ANIM_FACE4_RIGHT {
-        frame = &kong_face4_right as far *u16;
-    } else if anim_idx == KONG_ANIM_SIDE_LEFT {
-        frame = &kong_side_left as far *u16;
-    } else if anim_idx == KONG_ANIM_SIDE_RIGHT {
-        frame = &kong_side_right as far *u16;
-    } else if anim_idx == KONG_ANIM_THROW {
-        frame = &kong_throw as far *u16;
-    } else if anim_idx == KONG_ANIM_LAUGH {
-        frame = &kong_laugh as far *u16;
-    } else if anim_idx == KONG_ANIM_CLIMB1_RIGHT {
-        frame = &kong_climb1_right as far *u16;
-    } else if anim_idx == KONG_ANIM_CLIMB2_RIGHT {
-        frame = &kong_climb2_right as far *u16;
-    } else if anim_idx == KONG_ANIM_CLIMB1_LEFT {
-        frame = &kong_climb1_left as far *u16;
-    } else if anim_idx == KONG_ANIM_CLIMB2_LEFT {
-        frame = &kong_climb2_left as far *u16;
-    } else if anim_idx == KONG_ANIM_FALLING1 {
-        frame = &kong_falling1 as far *u16;
-    } else if anim_idx == KONG_ANIM_FALLING2 {
-        frame = &kong_falling2 as far *u16;
-    } else if anim_idx == KONG_ANIM_FELL {
-        frame = &kong_fell as far *u16;
-    } else {
-        frame = &kong_face1 as far *u16;
-    }
+    let frame: far *u16 = match anim_idx {
+        KONG_ANIM_FACE1 => &kong_face1 as far *u16,
+        KONG_ANIM_FACE2_BOTH => &kong_face2_both as far *u16,
+        KONG_ANIM_FACE3_BOTH => &kong_face3_both as far *u16,
+        KONG_ANIM_FACE4_BOTH => &kong_face4_both as far *u16,
+        KONG_ANIM_FACE2_LEFT => &kong_face2_left as far *u16,
+        KONG_ANIM_FACE3_LEFT => &kong_face3_left as far *u16,
+        KONG_ANIM_FACE4_LEFT => &kong_face4_left as far *u16,
+        KONG_ANIM_FACE2_RIGHT => &kong_face2_right as far *u16,
+        KONG_ANIM_FACE3_RIGHT => &kong_face3_right as far *u16,
+        KONG_ANIM_FACE4_RIGHT => &kong_face4_right as far *u16,
+        KONG_ANIM_SIDE_LEFT => &kong_side_left as far *u16,
+        KONG_ANIM_SIDE_RIGHT => &kong_side_right as far *u16,
+        KONG_ANIM_THROW => &kong_throw as far *u16,
+        KONG_ANIM_LAUGH => &kong_laugh as far *u16,
+        KONG_ANIM_CLIMB1_RIGHT => &kong_climb1_right as far *u16,
+        KONG_ANIM_CLIMB2_RIGHT => &kong_climb2_right as far *u16,
+        KONG_ANIM_CLIMB1_LEFT => &kong_climb1_left as far *u16,
+        KONG_ANIM_CLIMB2_LEFT => &kong_climb2_left as far *u16,
+        KONG_ANIM_FALLING1 => &kong_falling1 as far *u16,
+        KONG_ANIM_FALLING2 => &kong_falling2 as far *u16,
+        KONG_ANIM_FELL => &kong_fell as far *u16,
+        _ => &kong_face1 as far *u16,
+    };
 
     // Draw 4 sprites for Kong
     let mut off: u16 = oam_off;
@@ -749,43 +726,48 @@ far fn kong_process_level2() -> u8 {
     // Moving ladders: state machine per ladder (0=down, 1=delay, 2=up, 3=delay)
     for li in 0..2 {
         let dir: u8 = ladders_dir[li];
-        if dir == 0 {
-            // Moving down: 1 pixel every 8 frames, 16 pixels total
-            if (game_frame_cnt & 7) == 0 {
-                if ladders_cnt[li] < 16 {
-                    ladders_y[li]++;
-                    ladders_cnt[li]++;
-                } else {
-                    ladders_dir[li] = 1;
-                    ladders_cnt[li] = 64 + ((rand() & 15) as u8) + (li << 4);
+        match dir {
+            0 => {
+                // Moving down: 1 pixel every 8 frames, 16 pixels total
+                if (game_frame_cnt & 7) == 0 {
+                    if ladders_cnt[li] < 16 {
+                        ladders_y[li]++;
+                        ladders_cnt[li]++;
+                    } else {
+                        ladders_dir[li] = 1;
+                        ladders_cnt[li] = 64 + ((rand() & 15) as u8) + (li << 4);
+                    }
                 }
-            }
-        } else if dir == 1 {
-            // Delay before going up
-            if ladders_cnt[li] != 0 {
-                ladders_cnt[li]--;
-            } else {
-                ladders_dir[li] = 2;
-            }
-        } else if dir == 2 {
-            // Moving up: 1 pixel every 4 frames, 16 pixels total
-            if (game_frame_cnt & 3) == 0 {
-                if ladders_cnt[li] < 16 {
-                    ladders_y[li]--;
-                    ladders_cnt[li]++;
+            },
+            1 => {
+                // Delay before going up
+                if ladders_cnt[li] != 0 {
+                    ladders_cnt[li]--;
                 } else {
-                    ladders_dir[li] = 3;
-                    ladders_cnt[li] = 64 + ((rand() & 15) as u8) + (li << 4);
+                    ladders_dir[li] = 2;
                 }
-            }
-        } else {
-            // dir == 3: Delay before going down
-            if ladders_cnt[li] != 0 {
-                ladders_cnt[li]--;
-            } else {
-                ladders_dir[li] = 0;
-            }
-        }
+            },
+            2 => {
+                // Moving up: 1 pixel every 4 frames, 16 pixels total
+                if (game_frame_cnt & 3) == 0 {
+                    if ladders_cnt[li] < 16 {
+                        ladders_y[li]--;
+                        ladders_cnt[li]++;
+                    } else {
+                        ladders_dir[li] = 3;
+                        ladders_cnt[li] = 64 + ((rand() & 15) as u8) + (li << 4);
+                    }
+                }
+            },
+            _ => {
+                // dir == 3: Delay before going down
+                if ladders_cnt[li] != 0 {
+                    ladders_cnt[li]--;
+                } else {
+                    ladders_dir[li] = 0;
+                }
+            },
+        };
 
         // Push player down if standing above the ladder top (all dirs except 3)
         if ladders_dir[li] != 3 {
@@ -1050,13 +1032,10 @@ far fn kong_process_level4() -> u8 {
 // ============================================================================
 
 far fn kong_process() -> u8 {
-    if game_level == 0 {
-        return kong_process_level1();
-    } else if game_level == 1 {
-        return kong_process_level2();
-    } else if game_level == 2 {
-        return kong_process_level3();
-    } else {
-        return kong_process_level4();
-    }
+    return match game_level {
+        0 => kong_process_level1(),
+        1 => kong_process_level2(),
+        2 => kong_process_level3(),
+        _ => kong_process_level4(),
+    };
 }
