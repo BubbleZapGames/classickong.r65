@@ -1,7 +1,7 @@
 // ============================================================================
 // Classic Kong Complete - Main Entry Point
 // ============================================================================
-// SNES LoROM port of Classic Kong from the original C/ASM source
+// Classic Kong Complete for SNES (LoROM)
 // ============================================================================
 
 #[snesrom(name = "CLASSIC KONG", lorom, fastrom)]
@@ -322,7 +322,7 @@ far fn fade_screen(fade_in: u8, with_sound: u8) {
         } else {
             set_bright(15 - level);
 
-            // Fade out sound in step with brightness — matches game.c:998-1003
+            // Fade out sound in step with brightness
             if with_sound != 0 {
                 volume = volume - 8;
                 if volume < 0 {
@@ -663,8 +663,8 @@ far fn game_loop() -> u8 {
     oam_clear();
 
     // Load level graphics
-    // Note: C version loads font/tileset1 once in main(), but the R65 port
-    // reloads them here to ensure they survive cutscene VRAM changes.
+    // Note: font/tileset1 are reloaded here (rather than once at startup)
+    // to ensure they survive cutscene VRAM changes.
     dma_copy_vram_const!(0, font_gfx_data, 0x1000, 2048);
     dma_copy_vram_const!(7, tileset1_gfx_data, 0x1400, 2048);
     setup_ingame_graphics();
@@ -975,7 +975,7 @@ far fn game_loop() -> u8 {
         }
 
         // Spawn the blinking "HELP" particle near the princess every
-        // 256 frames (matches C original at game_loop.h:1439-1442).
+        // 256 frames.
         if (game_frame_cnt & 0xFF) == 0 {
             let help_x: u8 = if game_flip == 0 { 96 } else { 176 };
             particle_add(PART_TYPE_HELP, help_x, 12);

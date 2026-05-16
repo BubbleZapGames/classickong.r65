@@ -62,7 +62,7 @@ static mut princess_x: u8;
 
 #[lowram]
 // Signed so the climb-off-screen path in cutscene_next_level can let
-// princess_y go negative (matches C original's `static int princess_y`).
+// princess_y go negative.
 static mut princess_y: i16;
 
 
@@ -268,7 +268,6 @@ static kong_climb2_left: [u16; 12] = [
 
 // Kong falling sprites (level-end cutscene). y-offsets are signed; the u16
 // storage is reinterpreted as i16 by game_show_kong's frame[idx+1] as i16.
-// Match game.c:622-644.
 static kong_falling1: [u16; 12] = [
     0xFFF8 /* -8 */,  8, KONG_TILE + 0x80 | KONG_ATR,
                   8,  8, KONG_TILE + 0x82 | KONG_ATR,
@@ -283,9 +282,9 @@ static kong_falling2: [u16; 12] = [
                   8, 24, KONG_TILE + 0x8E | KONG_ATR
 ];
 
-// Fell sprite has only 3 visible sprites; the C original terminates with 128
-// after entry 3. Pad the 4th entry with a y-offset that puts it off-screen
-// (game_show_kong hides any sprite whose final y is >= 240).
+// Fell sprite has only 3 visible sprites. Pad the 4th entry with a
+// y-offset that puts it off-screen (game_show_kong hides any sprite
+// whose final y is >= 240).
 static kong_fell: [u16; 12] = [
     0xFFF8 /* -8 */,  8, KONG_TILE + 0x88 | KONG_ATR,
                   8,  8, KONG_TILE + 0x8C | KONG_ATR,
@@ -414,7 +413,7 @@ far fn game_show_kong(oam_off: u16, kx: u8, ky: i16) {
         let sy: i16 = ky + (frame[idx + 1] as i16);
         let tile: u16 = frame[idx + 2];
 
-        // Mirrors C original (game_loop.h:223-237):
+        // Branch logic:
         //   if (ky >= 0)        { if (ky < 240) oam_spr1(...); else hide; }
         //   else /* ky < 0 */   { oam_spr(...); }
         // Negative ky must draw via oam_spr — that's how Kong climbs off
@@ -459,7 +458,7 @@ far fn game_show_princess(frame: u8) {
         flip = SPR_HFLIP;
     }
 
-    // Mirrors C original (game_loop.h:325-339):
+    // Branch logic:
     //   if (princess_y < 224) {
     //     i = frame << 1;
     //     if (princess_y >= 0) { oam_spr1(...); oam_spr1(...); }
@@ -1001,9 +1000,9 @@ far fn kong_process_level4() -> u8 {
             game_fireballs++;
 
             // Find a spawn point that's both vertically far (>32 px) from
-            // the player AND on the opposite half of the screen — matches
-            // C game_levels.h:471-481. Without this filter fireballs can
-            // appear right next to / behind the player.
+            // the player AND on the opposite half of the screen. Without
+            // this filter fireballs can appear right next to / behind the
+            // player.
             let mut spawn_idx: u8 = mod8(rand() as u8, fireball_spawn_all);
             let mut fx: u8 = 0;
             let mut fy: u8 = 0;

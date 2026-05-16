@@ -75,7 +75,7 @@ static platform_anim: [u16; 16] = [
 // FUNCTION: Setup HDMA Color Gradient
 // ============================================================================
 // n: gradient index (0-7), or 0xFF to disable HDMA only
-// C original mapping:
+// Gradient index mapping:
 //   0 = no gradient (null tables)
 //   1 = level 1 (gradient0)
 //   2 = level 2 (gradient5)
@@ -340,7 +340,7 @@ far fn full_title_screen() -> u8 {
 far fn cutscene_level() {
 
     // Kong-stack animation state. Fixed-point 10.6 (pixels << 6).
-    // C original: ty = (64+40*2)<<6 = 9216, y = -32<<6 = -2048.
+    // Initial ty = (64+40*2)<<6 = 9216, y = -32<<6 = -2048.
     let mut stack_y: [i16; 4] = [-2048, -2048, -2048, -2048];
     let mut stack_ty: [i16; 4] = [9216, 6656, 4096, 1536];
     let mut stack_dy: [i16; 4] = [0, 0, 0, 0];
@@ -424,7 +424,7 @@ far fn cutscene_level() {
                 if stack_y[j] >= stack_ty[j] {
                     stack_y[j] = stack_ty[j];
                     // Bounce: reverse velocity, dampened
-                    // C: stack_dy = 0 - ((stack_dy << 6) / 160)
+                    // Exact: stack_dy = 0 - ((stack_dy << 6) / 160)
                     // Simplify: dy / 2.5 ≈ (dy << 6) / 160 ≈ dy * 2 / 5
                     // Use shift approximation: dy >> 1 - dy >> 3 ≈ dy * 0.375
                     let damp: i16 = (stack_dy[j] >> 1) - (stack_dy[j] >> 3);
@@ -792,10 +792,10 @@ far fn cutscene_levels_clear() {
     game_flip = 0;
 
     set_bright(0);
-    setup_hdma_gradient(0xFF);  // Disable HDMA before VRAM uploads (cutscenes.h:48)
+    setup_hdma_gradient(0xFF);  // Disable HDMA before VRAM uploads
     oam_clear();
 
-    // Reload font + tileset1 — the C original assumes they persist from
+    // Reload font + tileset1 — they would otherwise persist from
     // main()'s one-time upload, but title_screen overlays $1800-$23FF
     // (covering the upper half of tileset1 at $1400-$1BFF), so without
     // this reload BG1 renders garbage tiles for any tile index whose
@@ -820,8 +820,7 @@ far fn cutscene_levels_clear() {
     // pushes back1_gfx into VRAM $4000 (BG2 graphics), and regenerates the
     // BG2 mask from the BG1 nametable. Without it, palette 1 keeps the
     // level-4 alt palette so the bridge/platforms render in the wrong
-    // colors and BG2 keeps level-4 graphics as a backdrop. Matches
-    // cutscenes.h:58.
+    // colors and BG2 keeps level-4 graphics as a backdrop.
     set_background(1);
 
     update_nametables();
@@ -842,7 +841,7 @@ far fn cutscene_levels_clear() {
     particles_clear();
     kong_frame_idx = KONG_ANIM_FACE1;
 
-    setup_hdma_gradient(6);  // Enable victory-cutscene gradient (cutscenes.h:88)
+    setup_hdma_gradient(6);  // Enable victory-cutscene gradient
 
     // Set all sprites to 16x16
     for i in 0..128 {
@@ -879,7 +878,7 @@ far fn cutscene_levels_clear() {
         // frame so the in-progress bridge formation actually appears in VRAM.
         dma_copy_vram(7, &nametable1[POS!(8, 7)] as far *u8, POS!(8, 7), 16 * 2);
 
-        // Screen shake when Kong hits the ground (cutscenes.h:107-126).
+        // Screen shake when Kong hits the ground.
         if shake_cnt != 0 {
             shake_cnt--;
             if (shake_cnt & 2) != 0 {
@@ -976,7 +975,7 @@ far fn cutscene_levels_clear() {
         game_show_princess(princess_frame);
 
         // Player sprite uses the proper walk-left animation indexed by
-        // (player_x >> 1) & 3 (matches game_loop.h:220's playerWalkAnimLeft).
+        // (player_x >> 1) & 3 via player_walk_anim_left.
         oam_spr1(player_x, player_y,
                  player_walk_anim_left[((player_x >> 1) & 3) as u8],
                  OAM_PLAYER);
@@ -1001,8 +1000,8 @@ far fn cutscene_levels_clear() {
             music_play(MUS_VICTORY);
         }
 
-        // Append a bridge tile every 4 frames once the fall is well underway,
-        // matches cutscenes.h:244-250. Tile 0x145 with palette 1 + priority.
+        // Append a bridge tile every 4 frames once the fall is well underway.
+        // Tile 0x145 with palette 1 + priority.
         if frame > 420 && (frame & 3) == 0 {
             if nm_ptr > 0xE7 {
                 nametable1[nm_ptr] = 0x0145 | BG_PAL!(1) | BG_PRI;
@@ -1098,9 +1097,9 @@ far fn cutscene_next_level() {
     delay(25);
 
     // Kong jumps from his position to the ladder, grabbing the princess.
-    // C original (cutscenes.h:787-838) uses a `side` variable that flips
-    // for level 1 so Kong faces the correct direction for that level's
-    // mirrored layout. side = game_flip (XOR 1 if game_level == 1).
+    // A `side` variable flips for level 1 so Kong faces the correct
+    // direction for that level's mirrored layout.
+    // side = game_flip (XOR 1 if game_level == 1).
     let mut side: u8 = game_flip;
     if game_level == 1 {
         side = side ^ 1;
@@ -1167,9 +1166,8 @@ far fn cutscene_next_level() {
         game_frame_cnt++;
     }
 
-    // Kong climbs away with the princess. C original (cutscenes.h:842-863)
-    // alternates between Climb1 and Climb2 sprites for the climbing animation
-    // — NOT face frames.
+    // Kong climbs away with the princess, alternating between Climb1 and
+    // Climb2 sprites for the climbing animation — NOT face frames.
     while kong_y > -32 {
         nmi_wait();
 

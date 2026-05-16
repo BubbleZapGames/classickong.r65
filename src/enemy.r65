@@ -289,7 +289,7 @@ far fn enemy_clear() {
 // Returns TRUE if successful, FALSE if no room
 // ============================================================================
 
-// ex is i16 (matches C's `int x`) so the level-3 bouncer spawn can pass
+// ex is i16 so the level-3 bouncer spawn can pass
 // negative values like -16 without sign loss — without this the bouncer's
 // fixed-point ix wraps and the bouncer gets stuck in the ix<0 suppression
 // branch (never removed, so springs accumulate each spawn).
@@ -754,10 +754,10 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
                     }
                 }
 
-                // Move using the LOCAL dx snapshot — matches C enemy.h:483
-                // `ox+=dx;` which uses the value BEFORE the bounce check
-                // wrote enemy_dx. Reading enemy_dx[i] here would reverse on
-                // the same frame, accumulating a 1-pixel drift per bounce.
+                // Move using the LOCAL dx snapshot — the value BEFORE the
+                // bounce check wrote enemy_dx. Reading enemy_dx[i] here would
+                // reverse on the same frame, accumulating a 1-pixel drift
+                // per bounce.
                 if dx == 1 {
                     ox++;
                 } else {
@@ -800,11 +800,10 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
                 }
             }
         } else {
-            // Check for ladder. Order matches C (enemy.h:514-552): try DOWN
-            // first; if taken, skip the UP check this frame. Without the
-            // early-out the UP rand check still fires (desyncs the RNG vs C)
-            // and can overwrite DIR_DOWN with DIR_UP when both ladders are
-            // present at this position.
+            // Check for ladder. Try DOWN first; if taken, skip the UP check
+            // this frame. Without the early-out the UP rand check still fires
+            // (desyncs the RNG) and can overwrite DIR_DOWN with DIR_UP when
+            // both ladders are present at this position.
             if (ox & 7) == 4 {
                 let mut ladder_taken: u8 = FALSE;
 
@@ -833,9 +832,9 @@ far fn process_fireball(i: u8, spr: u16, etype: u8) {
                         } else {
                             val = 64;
                         }
-                        // C tests rand && oy>40 together (enemy.h:547) — keep
-                        // both inside the same conditional so RNG consumption
-                        // matches even when oy <= 40.
+                        // Test rand && oy>40 together — keep both inside the
+                        // same conditional so RNG consumption matches even
+                        // when oy <= 40.
                         if ((rand() as u8) & 255) < val && oy > 40 {
                             enemy_ladder[i] = DIR_UP;
                         }
@@ -933,7 +932,7 @@ far fn process_bounce(i: u8, spr: u16) -> u8 {
     // Check for removal first — bouncer must be removable even while its
     // ix is "off-screen-left" (negative), otherwise after the if-block
     // freezes ix the bouncer can keep bouncing forever and never reach
-    // this check. Matches C source order: removal then suppression.
+    // this check. Order: removal then suppression.
     if enemy_iy[i] >= (224 << BOUNCE_FP) {
         enemy_remove(i, FALSE);
         return FALSE;
@@ -953,7 +952,7 @@ far fn process_bounce(i: u8, spr: u16) -> u8 {
 // ============================================================================
 
 far fn enemy_check_player_collision(ox: u8, oy: u16) -> u8 {
-    // Caller already gates on the odd-frame alternation (enemy.h:686);
+    // Caller already gates on the odd-frame alternation;
     // no inner frame check needed.
     if player_y + 12 > oy + 4 {
         if player_y + 4 < oy + 12 {
@@ -1153,8 +1152,8 @@ far fn enemy_process() -> u8 {
         }
 
         // Check collisions if enemy still active.
-        // Match original (enemy.h:702): alternate between player-collision and
-        // hammer-collision checks each frame. Without alternation, the player
+        // Alternate between player-collision and hammer-collision checks
+        // each frame. Without alternation, the player
         // dies on contact even when the hammer should destroy the enemy first.
         if etype != ENEMY_NONE {
             if (game_frame_cnt & 1) != 0 {

@@ -376,7 +376,6 @@ far fn items_draw() {
 // Takes the current elevator-state flag (T_ELEVATOR if the player is
 // riding an elevator this frame, 0 otherwise). Returns LEVEL_LOSE_WINCH
 // if the player touches an elevator gear while riding, otherwise 0.
-// Matches C process_items (game_loop.h:346).
 far fn items_check_collision(elevator: u8) -> u8 {
     let mut clear: u8 = 0;
     let mut i: u8 = 0;
@@ -386,7 +385,7 @@ far fn items_check_collision(elevator: u8) -> u8 {
 
         if itype == ITEM_ELEVATOR {
             // Gear at the top/bottom of an elevator shaft kills the player
-            // if they're being carried into it. game_loop.h:357-369.
+            // if they're being carried into it.
             if elevator != 0 {
                 if item_y[i] + 8 > player_y {
                     if item_y[i] < player_y + 16 {
@@ -410,8 +409,8 @@ far fn items_check_collision(elevator: u8) -> u8 {
                             item_type[i] = ITEM_NONE;
 
                             player_hammer_time = 600;  // 10 seconds at 60fps
-                            player_hammer_phase = 0;   // game_loop.h:384
-                            player_hammer_cnt = 0;     // game_loop.h:385
+                            player_hammer_phase = 0;
+                            player_hammer_cnt = 0;
                             sfx_play(SFX_CHN + 3, SFX_ITEM, player_x + 8);
                             music_play(MUS_HAMMER);
                         }
@@ -504,7 +503,7 @@ far fn elevator_add(x: u8, y: u8, dy: i8) {
 // Returns T_ELEVATOR (16) if the player is on an elevator tile after the
 // move, 0 otherwise. Used by items_check_collision to know when to kill
 // the player on contact with the gear sprites at the top/bottom of the
-// elevator shaft (matches C game_loop.h:431 process_elevators return).
+// elevator shaft.
 far fn elevators_process() -> u8 {
     let mut spr: u16 = OAM_ELEVATORS;
     let mut i: u8 = 0;

@@ -259,8 +259,7 @@ far fn pad_poll_trigger(joy: u16) -> u16 {
 // ============================================================================
 
 // Copy `count` 16-bit colors from `src` into palette_buffer starting at
-// color index `start`. Mirrors C set_palette (sneslib.h:224):
-//   memcpy(&snes_palette[i], src, len * sizeof(unsigned int));
+// color index `start`.
 far fn set_palette(start: u16, count: u16, src: far *u16) {
     let mut i: u16 = 0;
     loop {
@@ -394,7 +393,7 @@ far fn set_background(n: u8) {
         set_palette(16, 16, &tileset1_pal as far *u16);
     }
 
-    // If n == 0xFF (was -1 in C), just clear VRAM and return
+    // If n == 0xFF (the sentinel), just clear VRAM and return
     if n == 0xFF {
         fill_vram(0x4000, 0, 24576);
         return;
@@ -836,10 +835,7 @@ far fn update_nametables() {
 // FUNCTION: RLE Decompression
 // ============================================================================
 
-// Tag-byte RLE decompression from ROM to map[]. Mirrors game.c:928:
-//   tag = *src++; while (1) { i = *src++; if (i == tag) { i = *src++;
-//   if (!i) break; while (i) { *dst++ = byte; --i; } } else
-//   { byte = i; *dst++ = byte; } }
+// Tag-byte RLE decompression from ROM to map[].
 // A byte equal to tag introduces a run of the last literal; a literal
 // is written through and remembered. End marker is `tag, 0x00`.
 far fn unrle(src: far *u8) {
@@ -1333,7 +1329,7 @@ far fn game_wait_and_update_nametables() {
     }
 
     // Update burning barrel (level 1) — same pattern as the conveyor/rivet
-    // updates above, matching the C original at game_loop.h:541-544.
+    // updates above.
     if game_level == 0 {
         let fire_pos: u16 = POS!((barrel_fire_x >> 3) as u16, (barrel_fire_y >> 3) as u16);
         dma_copy_vram(7, &nametable1[fire_pos] as far *u8, fire_pos, 4);

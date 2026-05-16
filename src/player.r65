@@ -344,7 +344,6 @@ far fn player_process_ground(pad: u16) {
     }
 
     // Remove a rivet when the player is standing on it (level 4).
-    // Matches game_loop.h:1091-1129 in the C original.
     let rx: u8 = player_x + 8;
     let ry: u8 = player_y + 16;
     if (test_map(rx, ry as u16) & T_RIVET) != 0 {
@@ -379,8 +378,8 @@ far fn player_process_ground(pad: u16) {
     // Update walk animation based on direction. The else-branch (idle on
     // ground) is needed so that landing from a jump without holding a
     // direction resets the sprite from the airborne jump-frame back to the
-    // standing frame; the C original leaves player_anim untouched here, so
-    // it would stay stuck in the jump pose until the player walked.
+    // standing frame. Without this reset player_anim would stay stuck in
+    // the jump pose until the player walked.
     if player_dir == DIR_LEFT {
         let mut frame: u8 = mod8((player_step >> 2) as u8, 6);
         player_anim = player_walk_anim_left[frame];
@@ -734,7 +733,7 @@ far fn player_process_hammer() {
     oam_spr1(hx as u8, hy as u8, hammer_sprites[off], OAM_HAMMER);
     oam_spr1(player_x, player_y, hammer_sprites[off + 1], OAM_HAMMER + 4);
 
-    // ---- Update timer / phase (matches game_loop.h:1477, palette flash omitted) ----
+    // ---- Update timer / phase (palette flash omitted) ----
     player_hammer_time--;
 
     if player_hammer_time == 0 {
