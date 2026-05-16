@@ -85,19 +85,17 @@ static platform_anim: [u16; 16] = [
 //   6 = sound test / levels clear (gradient4)
 //   7 = how high can you get (gradient6)
 
+// Load each table's 24-bit address into the channel 0/1/2 HDMA
+// base-address registers. A1Tn is a 16-bit reg (covers A1TnL+A1TnH);
+// A1Bn is the bank byte. Deriving the bank from the far pointer also
+// sidesteps the WLA-DX `#:`-on-WRAM bank pitfall.
 macro_rules! hdma_set_tables($l0:expr, $l1:expr, $l2:expr) {
-    asm!(
-        "LDA #<{L0}", "STA $4302",   // A1T0L
-        "LDA #>{L0}", "STA $4303",   // A1T0H
-        "LDA #:{L0}", "STA $4304",   // A1B0
-        "LDA #<{L1}", "STA $4312",   // A1T1L
-        "LDA #>{L1}", "STA $4313",   // A1T1H
-        "LDA #:{L1}", "STA $4314",   // A1B1
-        "LDA #<{L2}", "STA $4322",   // A1T2L
-        "LDA #>{L2}", "STA $4323",   // A1T2H
-        "LDA #:{L2}", "STA $4324",   // A1B2
-        L0=stringify!($l0), L1=stringify!($l1), L2=stringify!($l2)
-    );
+    A1T0 = (&$l0 as far *u8) as u16;
+    A1B0 = (&$l0 as far *u8).bank_byte();
+    A1T1 = (&$l1 as far *u8) as u16;
+    A1B1 = (&$l1 as far *u8).bank_byte();
+    A1T2 = (&$l2 as far *u8) as u16;
+    A1B2 = (&$l2 as far *u8).bank_byte();
 }
 
 far fn setup_hdma_gradient(n: u8) {
@@ -119,24 +117,23 @@ far fn setup_hdma_gradient(n: u8) {
     BBAD2 = 0x32;
 
     // Select gradient tables based on n.
-    // Macro args use WLA-DX label names (compiler appends _data suffix).
     match n {
         // No gradient
-        0 => { hdma_set_tables!(hdma_null_data,            hdma_null_data,            hdma_null_data); },
+        0 => { hdma_set_tables!(hdma_null,            hdma_null,            hdma_null); },
         // Level 1
-        1 => { hdma_set_tables!(hdma_gradient0_list0_data, hdma_gradient0_list1_data, hdma_gradient0_list2_data); },
+        1 => { hdma_set_tables!(hdma_gradient0_list0, hdma_gradient0_list1, hdma_gradient0_list2); },
         // Level 2
-        2 => { hdma_set_tables!(hdma_gradient5_list0_data, hdma_gradient5_list1_data, hdma_gradient5_list2_data); },
+        2 => { hdma_set_tables!(hdma_gradient5_list0, hdma_gradient5_list1, hdma_gradient5_list2); },
         // Level 3
-        3 => { hdma_set_tables!(hdma_gradient2_list0_data, hdma_gradient2_list1_data, hdma_gradient2_list2_data); },
+        3 => { hdma_set_tables!(hdma_gradient2_list0, hdma_gradient2_list1, hdma_gradient2_list2); },
         // Level 4
-        4 => { hdma_set_tables!(hdma_gradient1_list0_data, hdma_gradient1_list1_data, hdma_gradient1_list2_data); },
+        4 => { hdma_set_tables!(hdma_gradient1_list0, hdma_gradient1_list1, hdma_gradient1_list2); },
         // Title screen
-        5 => { hdma_set_tables!(hdma_gradient3_list0_data, hdma_gradient3_list1_data, hdma_gradient3_list2_data); },
+        5 => { hdma_set_tables!(hdma_gradient3_list0, hdma_gradient3_list1, hdma_gradient3_list2); },
         // Sound test / levels clear
-        6 => { hdma_set_tables!(hdma_gradient4_list0_data, hdma_gradient4_list1_data, hdma_gradient4_list2_data); },
+        6 => { hdma_set_tables!(hdma_gradient4_list0, hdma_gradient4_list1, hdma_gradient4_list2); },
         // How high can you get (n >= 7)
-        _ => { hdma_set_tables!(hdma_gradient6_list0_data, hdma_gradient6_list1_data, hdma_gradient6_list2_data); },
+        _ => { hdma_set_tables!(hdma_gradient6_list0, hdma_gradient6_list1, hdma_gradient6_list2); },
     };
 
     HDMAEN = 0x07;  // Enable HDMA channels 0, 1, 2
