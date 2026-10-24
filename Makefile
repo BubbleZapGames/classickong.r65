@@ -16,7 +16,8 @@ rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2)$(filter $(s
 R65_SRCS = $(call rwildcard,src,*.r65)
 
 # Tools
-R65C = python -m r65.compiler.main
+PYTHON = python
+R65C = $(PYTHON) -m r65.compiler.main
 WLA = wla-65816
 WLA_LINK = wlalink
 
@@ -24,12 +25,19 @@ WLA_LINK = wlalink
 WLA_FLAGS = -o
 R65C_FLAGS = -v --cfg snes --dbg
 
+# File operations through Python (already required for R65): Windows make
+# runs recipes in cmd.exe when no sh.exe is on PATH, where `mkdir -p` makes a
+# folder named "-p" and `rm -rf` doesn't exist.
+MKDIR = $(PYTHON) -c "import os, sys; [os.makedirs(d, exist_ok=True) for d in sys.argv[1:]]"
+RMDIR = $(PYTHON) -c "import shutil, sys; [shutil.rmtree(d, ignore_errors=True) for d in sys.argv[1:]]"
+RM = $(PYTHON) -c "import glob, os, sys; [os.remove(f) for p in sys.argv[1:] for f in glob.glob(p)]"
+
 # Default target
 all: $(ROM_FILE)
 
 # Compile R65 source to WLA-DX assembly
 $(BUILD_DIR)/main.asm: $(R65_SRCS)
-	@mkdir -p $(BUILD_DIR)
+	@$(MKDIR) $(BUILD_DIR)
 	$(R65C) $(MAIN_SRC) -o $@ $(R65C_FLAGS)
 
 # Assemble WLA-DX object file
@@ -49,8 +57,8 @@ r65x-build:
 # Clean build artifacts
 clean:
 	@echo "[CLEAN] Removing build artifacts..."
-	rm -rf $(BUILD_DIR)
-	rm -f *.o *.asm *.smc *.sym *.map
+	$(RMDIR) $(BUILD_DIR)
+	$(RM) "*.o" "*.asm" "*.smc" "*.sym" "*.map"
 
 # Install dependencies
 install-deps:
