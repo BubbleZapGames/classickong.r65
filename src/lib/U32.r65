@@ -80,7 +80,7 @@ macro_rules! _hwdiv_first() {
 // U32 Implementation
 // ============================================================================
 
-impl far U32 {
+impl U32 {
     // ========================================================================
     // Binary operation macros: dest = self op b
     // Usage: a.add_to!(b, dest)  →  dest = a + b
